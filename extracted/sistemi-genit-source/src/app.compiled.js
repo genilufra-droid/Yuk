@@ -8779,7 +8779,11 @@ function SalesHistoryView({
     style: {
       display: loading ? 'none' : 'block'
     }
-  }, viewMode === 'list' && React.createElement(React.Fragment, null, React.createElement("table", {
+  }, React.createElement("div", {
+    style: {
+      display: viewMode === 'list' ? 'block' : 'none'
+    }
+  }, React.createElement("table", {
     id: "salesTable",
     className: "display",
     style: {
@@ -13487,7 +13491,11 @@ function PurchaseOrdersView({
     style: {
       display: loading ? 'none' : 'block'
     }
-  }, viewMode === 'list' && React.createElement(React.Fragment, null, React.createElement("table", {
+  }, React.createElement("div", {
+    style: {
+      display: viewMode === 'list' ? 'block' : 'none'
+    }
+  }, React.createElement("table", {
     id: "poTable",
     className: "display",
     style: {

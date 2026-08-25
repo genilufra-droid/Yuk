@@ -3650,7 +3650,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.0.1'
+      initializedVersion: '1.1.0'
     };
 
     try {
@@ -9204,16 +9204,14 @@ const kanbanColumns = useMemo(() => {
       </div>
       {loading && <TableSkeleton rows={8} columns={10} />}
       <div style={{ display: loading ? 'none' : 'block' }}>
-        {viewMode === 'list' && (
-          <>
+        <div style={{ display: viewMode === 'list' ? 'block' : 'none' }}>
             <table id="salesTable" className="display" style={{ width: '100%' }}></table>
             <FilteredSummaryBar tableRef={tableInstanceRef} deps={[tableData, qSearch, facetPay, facetStatus]} itemsBuilder={(rows) => [
               { label: 'Shitje (filtruar)', value: rows.length },
               { label: 'Totali (filtruar)', value: money(rows.reduce((s, r) => s + Number(r.total || 0), 0)) },
               { label: 'Fitimi (filtruar)', value: money(rows.reduce((s, r) => s + Number(r.profit || 0), 0)) }
             ]} />
-          </>
-        )}
+        </div>
         {viewMode === 'kanban' && <OdooKanban columns={kanbanColumns} onDropCard={onSaleKanbanDrop} />}
         {sales.length > 0 && viewMode === 'list' && <SummaryBar items={[{ label: 'Sales', value: summary.count }, { label: 'Total', value: money(summary.total) }, { label: 'Profit', value: money(summary.profit) }, { label: 'Returned', value: money(summary.returned) }]} />}
       </div>
@@ -10682,8 +10680,7 @@ const poKanban = useMemo(() => {
       </div>
       {loading && <TableSkeleton rows={8} columns={8} />}
       <div style={{ display: loading ? 'none' : 'block' }}>
-        {viewMode === 'list' && (
-          <>
+        <div style={{ display: viewMode === 'list' ? 'block' : 'none' }}>
             <table id="poTable" className="display" style={{ width: '100%' }}></table>
             <FilteredSummaryBar tableRef={tableRef} deps={[displayPOs, qSearch, facetStatus]} itemsBuilder={(rows) => [
               { label: 'Porosi (filtruar)', value: rows.length },
@@ -10691,8 +10688,7 @@ const poKanban = useMemo(() => {
               { label: 'Hapura', value: rows.filter(r => r.status !== 'received' && r.status !== 'cancelled').length }
             ]} />
             {pos.length > 0 && <SummaryBar items={[{ label: 'POs', value: poSummary.count }, { label: 'Total Value', value: money(poSummary.total) }, { label: 'Open (unreceived)', value: money(poSummary.open) }]} />}
-          </>
-        )}
+          </div>
         {viewMode === 'kanban' && <OdooKanban columns={poKanban} onDropCard={onPoKanbanDrop} />}
       </div>
       {showModal && <PurchaseOrderModal suppliers={suppliers} products={products} onClose={() => setShowModal(false)} onSave={handleSave} />}
