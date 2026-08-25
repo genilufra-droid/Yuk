@@ -502,7 +502,7 @@ function openHtmlDocument(title, htmlBody, autoPrint) {
     return null;
   }
   w.document.open();
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + String(title || 'Dokument').replace(/</g, '&lt;') + '</title>' + '<style>' + 'html,body{margin:0;padding:0;background:#f0f0f0;color:#000;font-family:Arial,Helvetica,sans-serif}' + '.toolbar{position:sticky;top:0;z-index:9;display:flex;gap:8px;flex-wrap:wrap;padding:10px;background:#fff;border-bottom:1px solid #ddd}' + '.toolbar button{padding:8px 12px;border:0;border-radius:4px;font-weight:600;cursor:pointer}' + '.toolbar .p{background:#714B67;color:#fff}.toolbar .c{background:#e9ecef}' + '.sheet{background:#fff;margin:12px auto;box-shadow:0 2px 10px rgba(0,0,0,.12)}' + '@media print{body{background:#fff}.toolbar{display:none!important}.sheet{margin:0;box-shadow:none}}' + '.doc-thermal{width:80mm;max-width:100%;padding:4mm;font-size:12px;line-height:1.3}' + '.doc-thermal .c{text-align:center}.doc-thermal .b{font-weight:800}.doc-thermal .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}' + '.doc-thermal .rule{border-top:1px solid #000;margin:5px 0}.doc-thermal .total{font-size:16px;font-weight:900;display:flex;justify-content:space-between;margin:6px 0}' + '.doc-thermal .nslf{text-align:center;font-size:10px;word-break:break-all;margin-top:6px}' + '.doc-a4{width:210mm;max-width:100%;padding:10mm;box-sizing:border-box;font-size:10.5px}' + '.doc-a4 h1{text-align:center;font-size:20px;margin:0 0 8px;letter-spacing:1px}' + '.doc-a4 .box{border:1.4px solid #111;margin:0 0 6px}.doc-a4 .box .h{background:#f2f2f2;font-weight:700;padding:4px 6px;border-bottom:1px solid #111}' + '.doc-a4 .r{display:grid;grid-template-columns:42% 58%;border-bottom:1px solid #111}.doc-a4 .r:last-child{border-bottom:0}.doc-a4 .r>div{padding:4px 6px}' + '.doc-a4 table{width:100%;border-collapse:collapse;font-size:9px;margin-top:6px}' + '.doc-a4 th,.doc-a4 td{border:1px solid #111;padding:3px;text-align:center}.doc-a4 th{background:#eee}.doc-a4 td.l{text-align:left}' + '.doc-a4 .totals{width:52%;margin-left:auto}.doc-a4 .vat{width:75%;margin-top:8px}' + '.doc-a4 .pay th{background:#d9e8f5}.doc-a4 .sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:24px;text-align:center;font-weight:700}' + '.doc-a4 .sign div{border-top:1px solid #111;padding-top:4px;margin-top:28px}' + '.doc-a4 .tlabel{text-align:right}' + '.doc-a4 .b{font-weight:700}' + '.doc-a4 .vathead{margin:10px 0 2px;font-size:9.5px}' + '.doc-a4 .vat{width:70%;margin-top:2px}' + '.doc-a4 .vat td.rate{background:#cfe0ef}' + '.doc-a4 .fl{margin:6px 0 0;font-size:9.5px}' + '.doc-a4 .fl span{margin-left:10px}' + '.doc-fd{width:148mm;max-width:100%;min-height:210mm;padding:7mm;box-sizing:border-box;font-size:11px}' + '.doc-fd .fd-head{display:grid;grid-template-columns:1fr 1.15fr 1fr;border:2px solid #111}' + '.doc-fd .fd-head>div{min-height:18mm;border-right:2px solid #111;padding:4px;box-sizing:border-box}' + '.doc-fd .fd-head>div:last-child{border-right:none}' + '.doc-fd .fd-title{font-size:28px;font-weight:900;text-align:center;line-height:1}' + '.doc-fd .fd-topline{border-bottom:1px solid #111;height:8mm;margin-bottom:2mm}' + '.doc-fd .fd-subhead{display:grid;grid-template-columns:2fr 1fr 1fr;border:2px solid #111;border-top:0}' + '.doc-fd .fd-subhead>div{padding:6px;border-right:1px solid #111;box-sizing:border-box}' + '.doc-fd .fd-subhead>div:last-child{border-right:none}' + '.doc-fd .fd-serial{color:#c00;font-size:22px;text-align:center;font-weight:800}' + '.doc-fd .fd-table{width:100%;border-collapse:collapse;margin-top:3mm;font-size:11.5px}' + '.doc-fd .fd-table th,.doc-fd .fd-table td{border:1px solid #111;padding:4px 5px;height:7mm;box-sizing:border-box}' + '.doc-fd .fd-table th{background:#eee;font-weight:800;text-align:center}' + '.doc-fd .fd-table td:nth-child(1),.doc-fd .fd-table td:nth-child(3),.doc-fd .fd-table td:nth-child(4),.doc-fd .fd-table td:nth-child(5),.doc-fd .fd-table td:nth-child(6){text-align:center}' + '.doc-fd .fd-signs{display:grid;grid-template-columns:repeat(5,1fr);margin-top:7mm;border:1px solid #111}' + '.doc-fd .fd-signs>div{min-height:13mm;border-right:1px solid #111;padding:4px;text-align:center;font-weight:700;box-sizing:border-box}' + '.doc-fd .fd-signs>div:last-child{border-right:none}' + '</style></head><body>' + '<div class="toolbar"><button class="p" onclick="window.print()">Printo</button><button class="c" onclick="window.close()">Mbyll</button></div>' + htmlBody + '</body></html>');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + String(title || 'Dokument').replace(/</g, '&lt;') + '</title>' + '<style>' + 'html,body{margin:0;padding:0;background:#f0f0f0;color:#000;font-family:Arial,Helvetica,sans-serif}' + '.toolbar{position:sticky;top:0;z-index:9;display:flex;gap:8px;flex-wrap:wrap;padding:10px;background:#fff;border-bottom:1px solid #ddd}' + '.toolbar button{padding:8px 12px;border:0;border-radius:4px;font-weight:600;cursor:pointer}' + '.toolbar .p{background:#714B67;color:#fff}.toolbar .c{background:#e9ecef}' + '.sheet{background:#fff;margin:12px auto;box-shadow:0 2px 10px rgba(0,0,0,.12)}' + '@media print{body{background:#fff}.toolbar{display:none!important}.sheet{margin:0;box-shadow:none}}' + '.doc-thermal{width:80mm;max-width:100%;padding:4mm;font-size:12px;line-height:1.3}' + '.doc-thermal .c{text-align:center}.doc-thermal .b{font-weight:800}.doc-thermal .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px}' + '.doc-thermal .rule{border-top:1px solid #000;margin:5px 0}.doc-thermal .total{font-size:16px;font-weight:900;display:flex;justify-content:space-between;margin:6px 0}' + '.doc-thermal .nslf{text-align:center;font-size:10px;word-break:break-all;margin-top:6px}' + '.doc-a4{width:210mm;max-width:100%;padding:10mm;box-sizing:border-box;font-size:10.5px}' + '.doc-a4 h1{text-align:center;font-size:20px;margin:0 0 8px;letter-spacing:1px}' + '.doc-a4 .box{border:1.4px solid #111;margin:0 0 6px}.doc-a4 .box .h{background:#f2f2f2;font-weight:700;padding:4px 6px;border-bottom:1px solid #111}' + '.doc-a4 .r{display:grid;grid-template-columns:42% 58%;border-bottom:1px solid #111}.doc-a4 .r:last-child{border-bottom:0}.doc-a4 .r>div{padding:4px 6px}' + '.doc-a4 table{width:100%;border-collapse:collapse;font-size:9px;margin-top:6px}' + '.doc-a4 th,.doc-a4 td{border:1px solid #111;padding:3px;text-align:center}.doc-a4 th{background:#eee}.doc-a4 td.l{text-align:left}' + '.doc-a4 .totals{width:52%;margin-left:auto}.doc-a4 .vat{width:75%;margin-top:8px}' + '.doc-a4 .pay th{background:#d9e8f5}.doc-a4 .sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:24px;text-align:center;font-weight:700}' + '.doc-a4 .sign div{border-top:1px solid #111;padding-top:4px;margin-top:28px}' + '.doc-a4 .tlabel{text-align:right}' + '.doc-a4 .b{font-weight:700}' + '.doc-a4 .vathead{margin:10px 0 2px;font-size:9.5px}' + '.doc-a4 .vat{width:70%;margin-top:2px}' + '.doc-a4 .vat td.rate{background:#cfe0ef}' + '.doc-a4 .fl{margin:6px 0 0;font-size:9.5px}' + '.doc-a4 .fl span{margin-left:10px}' + '.doc-fd{width:148mm;max-width:100%;min-height:210mm;padding:7mm;box-sizing:border-box;font-size:11px}' + '.doc-fd .fd-head{display:grid;grid-template-columns:1fr 1.15fr 1fr;border:2px solid #111}' + '.doc-fd .fd-head>div{min-height:18mm;border-right:2px solid #111;padding:4px;box-sizing:border-box}' + '.doc-fd .fd-head>div:last-child{border-right:none}' + '.doc-fd .fd-title{font-size:28px;font-weight:900;text-align:center;line-height:1}' + '.doc-fd .fd-topline{border-bottom:1px solid #111;height:8mm;margin-bottom:2mm}' + '.doc-fd .fd-subhead{display:grid;grid-template-columns:2fr 1fr 1fr;border:2px solid #111;border-top:0}' + '.doc-fd .fd-subhead>div{padding:6px;border-right:1px solid #111;box-sizing:border-box}' + '.doc-fd .fd-subhead>div:last-child{border-right:none}' + '.doc-fd .fd-serial{color:#c00;font-size:22px;text-align:center;font-weight:800}' + '.doc-fd .fd-table{width:100%;border-collapse:collapse;margin-top:3mm;font-size:11.5px}' + '.doc-fd .fd-table th,.doc-fd .fd-table td{border:1px solid #111;padding:4px 5px;height:7mm;box-sizing:border-box}' + '.doc-fd .fd-table th{background:#fff;font-weight:800;text-align:center}' + '.doc-fd .fd-table td:nth-child(1),.doc-fd .fd-table td:nth-child(3),.doc-fd .fd-table td:nth-child(4),.doc-fd .fd-table td:nth-child(5),.doc-fd .fd-table td:nth-child(6){text-align:center}' + '.doc-fd .fd-subhead{display:grid;grid-template-columns:1.25fr .85fr 1.1fr 1fr;border:2px solid #111;border-top:0}' + '.doc-fd .fd-subhead>div{padding:6px;border-right:1px solid #111;box-sizing:border-box}' + '.doc-fd .fd-subhead>div:last-child{border-right:none}' + '.doc-fd .fd-subhead .fd-serial{color:#c00;font-size:22px;text-align:center;font-weight:800}' + '.doc-fd .fd-signs{width:100%;border-collapse:collapse;border:2px solid #111;border-top:0}' + '.doc-fd .fd-signs td{border:1px solid #111;padding:3px 4px;text-align:center;font-weight:700;font-size:10px}' + '.doc-fd .fd-signs td.a{text-align:left}' + '.doc-fd .fd-signs tr.s td{height:9mm;font-weight:400}' + '</style></head><body>' + '<div class="toolbar"><button class="p" onclick="window.print()">Printo</button><button class="c" onclick="window.close()">Mbyll</button></div>' + htmlBody + '</body></html>');
   w.document.close();
   try {
     w.focus();
@@ -927,7 +927,7 @@ function buildWarehouseHtml(sale) {
     return String(n || 0);
   };
   const docNo = typeof warehouseDocNoFromSale === 'function' ? warehouseDocNoFromSale(sale) : 'FD-' + saleDocNo(sale);
-  const serial = String(docNo || '').replace(/[^0-9]/g, '').slice(-7);
+  const serial = (String(docNo || '').replace(/[^0-9]/g, '') || '0').padStart(7, '0').slice(-7);
   let body = '';
   rows.slice(0, 21).forEach(function (r, index) {
     body += '<tr><td>' + escL(index + 1) + '</td><td style="text-align:left">' + escL(r.name) + '</td><td>' + escL(r.unit) + '</td><td>' + escL(fQ(r.qty)) + '</td><td>' + (Number(r.price || 0) ? escL(fL(r.price)) : '') + '</td><td>' + (Number(r.value || 0) ? escL(fL(r.value)) : '') + '</td></tr>';
@@ -935,7 +935,7 @@ function buildWarehouseHtml(sale) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
-  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline"></div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(sale.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(saleBuyerName(sale) || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<div class="fd-signs"><div>Emri, mbiemri<br>Nënshkrimi</div><div>Magazinieri</div><div>Marrësi në dorëzim</div><div>Transportuesi</div><div>Llogaritari</div></div>' + '</div>';
+  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline">' + escL(saleBuyerName(sale) || '') + '</div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(sale.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(saleBuyerAddress(sale) || saleBuyerName(sale) || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
 function buildWarehouseInHtml(receipt) {
   if (!receipt) return '';
@@ -960,7 +960,7 @@ function buildWarehouseInHtml(receipt) {
     return String(n || 0);
   };
   const docNo = typeof warehouseDocNoFromReceipt === 'function' ? warehouseDocNoFromReceipt(receipt) : 'FH-' + String(receipt.id || '').slice(-6).toUpperCase();
-  const serial = String(docNo || '').replace(/[^0-9]/g, '').slice(-7);
+  const serial = (String(docNo || '').replace(/[^0-9]/g, '') || '0').padStart(7, '0').slice(-7);
   let body = '';
   rows.slice(0, 21).forEach(function (r, index) {
     body += '<tr><td>' + escL(index + 1) + '</td><td style="text-align:left">' + escL(r.name) + '</td><td>' + escL(r.unit) + '</td><td>' + escL(fQ(r.qty)) + '</td><td>' + (Number(r.price || 0) ? escL(fL(r.price)) : '') + '</td><td>' + (Number(r.value || 0) ? escL(fL(r.value)) : '') + '</td></tr>';
@@ -968,7 +968,7 @@ function buildWarehouseInHtml(receipt) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
-  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><b>Furnitori / Origjina</b><div class="fd-topline" style="margin-top:8px">' + escL(receipt.supplierName || '') + '</div></div>' + '<div><div class="fd-title">FLETË HYRJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(receipt.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Magazina ku hyn malli</b><div class="fd-topline" style="margin-top:8px">' + escL(receipt.warehouse || 'Magazina Kryesore') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<div class="fd-signs"><div>Dorëzuesi<br>Nënshkrimi</div><div>Magazinieri</div><div>Marrësi në dorëzim</div><div>Transportuesi</div><div>Llogaritari</div></div>' + '</div>';
+  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline">' + escL(receipt.supplierName || '') + '</div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË - HYRJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(receipt.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa nga vjen malli</b><div class="fd-topline" style="margin-top:8px">' + escL(receipt.sourceAddress || receipt.supplierAddress || (receipt.warehouse ? 'Magazina: ' + receipt.warehouse : '')) + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
 async function openWarehouseReceiptInDocument(receiptOrId, autoPrint) {
   let receipt = receiptOrId;
@@ -1042,12 +1042,12 @@ function buildMovementWarehouseHtml(movement, product) {
   const cost = Number(movement.unitCost || p.cost || 0);
   const val = Number(qty || 0) * cost;
   const doc = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
-  const serial = String(doc || '').replace(/[^0-9]/g, '').slice(-7);
+  const serial = (String(docNo || '').replace(/[^0-9]/g, '') || '0').padStart(7, '0').slice(-7);
   let body = '<tr><td>1</td><td style="text-align:left">' + escL(name) + '</td><td>' + escL(unit) + '</td><td>' + escL(fQ(qty)) + '</td><td>' + (cost ? escL(fL(cost)) : '') + '</td><td>' + (val ? escL(fL(val)) : '') + '</td></tr>';
   for (let i = 1; i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
-  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline"></div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(doc) + '</b><b>Dt: ' + escL(reportDateOnly(movement.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(movement.reference || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<div class="fd-signs"><div>Emri, mbiemri<br>Nënshkrimi</div><div>Magazinieri</div><div>Marrësi në dorëzim</div><div>Transportuesi</div><div>Llogaritari</div></div>' + '</div>';
+  return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline"></div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(doc) + '</b><b>Dt: ' + escL(reportDateOnly(movement.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(movement.reference || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
 function openMovementDocument(movement, product, autoPrint) {
   openHtmlDocument('Fletë Dalje', buildMovementWarehouseHtml(movement, product), !!autoPrint);
@@ -6542,64 +6542,11 @@ function FleteDaljePrint({
   product
 }) {
   if (!movement) return null;
-  const rows = [movement];
   return React.createElement("div", {
-    className: "flete-dalje-print"
-  }, React.createElement("div", {
-    className: "fd-head"
-  }, React.createElement("div", null, React.createElement("div", {
-    className: "fd-topline"
-  }), React.createElement("div", {
-    className: "fd-topline"
-  })), React.createElement("div", null, React.createElement("div", {
-    className: "fd-title"
-  }, "FLET\xCB DALJE"), React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-around',
-      marginTop: 8
+    dangerouslySetInnerHTML: {
+      __html: buildMovementWarehouseHtml(movement, product)
     }
-  }, React.createElement("b", null, "Nr. ", String(movement.id || '').slice(-6).toUpperCase()), React.createElement("b", null, "Dt: ", reportDateOnly(movement.createdAt || nowIso())))), React.createElement("div", null, React.createElement("b", null, "Adresa ku shkon malli"), React.createElement("div", {
-    className: "fd-topline",
-    style: {
-      marginTop: 8
-    }
-  }, movement.reference || ''))), React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '2fr 1fr 1fr',
-      border: '2px solid #111',
-      borderTop: 0
-    }
-  }, React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Emri, mbiemri pers. Autorizuar"), React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Lloji e targa e Mjeti transp."), React.createElement("div", {
-    style: {
-      padding: 6,
-      color: '#c00',
-      fontSize: 22,
-      textAlign: 'center',
-      fontWeight: 800
-    }
-  }, String(movement.id || '').slice(-7).toUpperCase())), React.createElement("table", {
-    className: "fd-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Nr"), React.createElement("th", null, "Em\xEBrtimi i mallit"), React.createElement("th", null, "Nj\xEBsia"), React.createElement("th", null, "Sasia"), React.createElement("th", null, "\xC7mimi"), React.createElement("th", null, "Vlefta"))), React.createElement("tbody", null, rows.map((r, i) => React.createElement("tr", {
-    key: i
-  }, React.createElement("td", null, i + 1), React.createElement("td", null, product?.name || r.productName || '-'), React.createElement("td", null, r.unitName || unitBaseName(product)), React.createElement("td", null, r.enteredQty || r.qty), React.createElement("td", null, r.unitCost ? money(r.unitCost) : ''), React.createElement("td", null, r.unitCost ? money(Number(r.unitCost) * Number(r.qty || 0)) : ''))), Array.from({
-    length: 20 - rows.length
-  }).map((_, i) => React.createElement("tr", {
-    key: 'b' + i
-  }, React.createElement("td", null, i + rows.length + 1), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null))))), React.createElement("div", {
-    className: "fd-signs"
-  }, React.createElement("div", null, "Emri, mbiemri", React.createElement("br", null), "N\xEBnshkrimi"), React.createElement("div", null, "Magazinieri"), React.createElement("div", null, "Marr\xEBsi n\xEB dor\xEBzim"), React.createElement("div", null, "Transportuesi"), React.createElement("div", null, "Llogaritari")));
+  });
 }
 function StockView({
   user,
@@ -7410,131 +7357,21 @@ function FleteDaljeSalePrint({
   sale
 }) {
   if (!sale) return null;
-  const rows = warehouseRowsFromSale(sale);
   return React.createElement("div", {
-    className: "flete-dalje-print"
-  }, React.createElement("div", {
-    className: "fd-head"
-  }, React.createElement("div", null, React.createElement("div", {
-    className: "fd-topline"
-  }), React.createElement("div", {
-    className: "fd-topline"
-  })), React.createElement("div", null, React.createElement("div", {
-    className: "fd-title"
-  }, "FLET\xCB DALJE"), React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-around',
-      marginTop: 8
+    dangerouslySetInnerHTML: {
+      __html: buildWarehouseHtml(sale)
     }
-  }, React.createElement("b", null, "Nr. ", warehouseDocNoFromSale(sale)), React.createElement("b", null, "Dt: ", reportDateOnly(sale.createdAt || nowIso())))), React.createElement("div", null, React.createElement("b", null, "Adresa ku shkon malli"), React.createElement("div", {
-    className: "fd-topline",
-    style: {
-      marginTop: 8
-    }
-  }, sale.customerName || 'Klient pa emër'))), React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '2fr 1fr 1fr',
-      border: '2px solid #111',
-      borderTop: 0
-    }
-  }, React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Emri, mbiemri pers. Autorizuar"), React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Lloji e targa e Mjeti transp."), React.createElement("div", {
-    style: {
-      padding: 6,
-      color: '#c00',
-      fontSize: 22,
-      textAlign: 'center',
-      fontWeight: 800
-    }
-  }, String(warehouseDocNoFromSale(sale)).replace(/[^0-9]/g, '').slice(-7))), React.createElement("table", {
-    className: "fd-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Nr"), React.createElement("th", null, "Em\xEBrtimi i mallit"), React.createElement("th", null, "Nj\xEBsia"), React.createElement("th", null, "Sasia"), React.createElement("th", null, "\xC7mimi"), React.createElement("th", null, "Vlefta"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
-    key: r.nr
-  }, React.createElement("td", null, r.nr), React.createElement("td", null, r.name), React.createElement("td", null, r.unit), React.createElement("td", null, r.qty), React.createElement("td", null, r.price ? Number(r.price).toFixed(2) : ''), React.createElement("td", null, r.value ? Number(r.value).toFixed(2) : ''))), Array.from({
-    length: Math.max(0, 21 - rows.length)
-  }).map((_, i) => React.createElement("tr", {
-    key: 'b' + i
-  }, React.createElement("td", null, rows.length + i + 1), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null))))), React.createElement("div", {
-    className: "fd-signs"
-  }, React.createElement("div", null, "Emri, mbiemri", React.createElement("br", null), "N\xEBnshkrimi"), React.createElement("div", null, "Magazinieri"), React.createElement("div", null, "Marr\xEBsi n\xEB dor\xEBzim"), React.createElement("div", null, "Transportuesi"), React.createElement("div", null, "Llogaritari")));
+  });
 }
 function FleteHyrjePrint({
   receipt
 }) {
   if (!receipt) return null;
-  const rows = warehouseRowsFromPO(receipt);
   return React.createElement("div", {
-    className: "flete-dalje-print",
-    style: {
-      display: 'block'
+    dangerouslySetInnerHTML: {
+      __html: buildWarehouseInHtml(receipt)
     }
-  }, React.createElement("div", {
-    className: "fd-head"
-  }, React.createElement("div", null, React.createElement("b", null, "Furnitori / Origjina"), React.createElement("div", {
-    className: "fd-topline",
-    style: {
-      marginTop: 8
-    }
-  }, receipt.supplierName || '')), React.createElement("div", null, React.createElement("div", {
-    className: "fd-title"
-  }, "FLET\xCB HYRJE"), React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-around',
-      marginTop: 8
-    }
-  }, React.createElement("b", null, "Nr. ", warehouseDocNoFromReceipt(receipt)), React.createElement("b", null, "Dt: ", reportDateOnly(receipt.createdAt || nowIso())))), React.createElement("div", null, React.createElement("b", null, "Magazina ku hyn malli"), React.createElement("div", {
-    className: "fd-topline",
-    style: {
-      marginTop: 8
-    }
-  }, receipt.warehouse || 'Magazina Kryesore'))), React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '2fr 1fr 1fr',
-      border: '2px solid #111',
-      borderTop: 0
-    }
-  }, React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Emri, mbiemri pers. Autorizuar"), React.createElement("div", {
-    style: {
-      padding: 6,
-      borderRight: '1px solid #111'
-    }
-  }, "Lloji e targa e Mjeti transp."), React.createElement("div", {
-    style: {
-      padding: 6,
-      color: '#c00',
-      fontSize: 22,
-      textAlign: 'center',
-      fontWeight: 800
-    }
-  }, String(warehouseDocNoFromReceipt(receipt)).replace(/[^0-9]/g, '').slice(-7))), React.createElement("table", {
-    className: "fd-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Nr"), React.createElement("th", null, "Em\xEBrtimi i mallit"), React.createElement("th", null, "Nj\xEBsia"), React.createElement("th", null, "Sasia"), React.createElement("th", null, "\xC7mimi"), React.createElement("th", null, "Vlefta"))), React.createElement("tbody", null, rows.slice(0, 21).map(r => React.createElement("tr", {
-    key: r.nr
-  }, React.createElement("td", null, r.nr), React.createElement("td", null, r.name), React.createElement("td", null, r.unit), React.createElement("td", null, r.qty), React.createElement("td", null, r.price ? Number(r.price).toFixed(2) : ''), React.createElement("td", null, r.value ? Number(r.value).toFixed(2) : ''))), Array.from({
-    length: Math.max(0, 21 - rows.length)
-  }).map((_, i) => React.createElement("tr", {
-    key: 'fhb' + i
-  }, React.createElement("td", null, Math.min(rows.length, 21) + i + 1), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null))))), React.createElement("div", {
-    className: "fd-signs"
-  }, React.createElement("div", null, "Dor\xEBzuesi", React.createElement("br", null), "N\xEBnshkrimi"), React.createElement("div", null, "Magazinieri"), React.createElement("div", null, "Marr\xEBsi n\xEB dor\xEBzim"), React.createElement("div", null, "Transportuesi"), React.createElement("div", null, "Llogaritari")));
+  });
 }
 function WarehouseReceiptInOverlay({
   receipt,

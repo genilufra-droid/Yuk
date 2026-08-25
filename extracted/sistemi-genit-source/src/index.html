@@ -627,10 +627,15 @@ table.dataTable tbody tr.row-ok td { background: #f3faf5 !important; }
 .fd-topline { border-bottom:1px solid #111; height:8mm; margin-bottom:2mm; }
 .fd-table { width:100%; border-collapse:collapse; margin-top:3mm; font-size:11.5px; }
 .fd-table th, .fd-table td { border:1px solid #111; padding:4px 5px; height:7mm; }
-.fd-table th { background:#eee; font-weight:800; text-align:center; }
-.fd-signs { display:grid; grid-template-columns: repeat(5, 1fr); margin-top:7mm; border:1px solid #111; }
-.fd-signs div { min-height:13mm; border-right:1px solid #111; padding:4px; text-align:center; font-weight:700; }
-.fd-signs div:last-child { border-right:none; }
+.fd-table th { background:#fff; font-weight:800; text-align:center; }
+.fd-subhead { display:grid; grid-template-columns:1.25fr 0.85fr 1.1fr 1fr; border:2px solid #111; border-top:0; }
+.fd-subhead > div { padding:6px; border-right:1px solid #111; box-sizing:border-box; }
+.fd-subhead > div:last-child { border-right:none; }
+.fd-subhead .fd-serial { color:#c00; font-size:22px; text-align:center; font-weight:800; }
+.fd-signs { width:100%; border-collapse:collapse; border:2px solid #111; border-top:0; }
+.fd-signs td { border:1px solid #111; padding:3px 4px; text-align:center; font-weight:700; font-size:10px; }
+.fd-signs td.a { text-align:left; }
+.fd-signs tr.s td { height:9mm; font-weight:400; }
 @media print {
   body[data-print-mode] * { visibility:hidden !important; }
   body[data-print-mode="thermal"] .thermal-slip-print, body[data-print-mode="thermal"] .thermal-slip-print *,
