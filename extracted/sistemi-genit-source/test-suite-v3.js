@@ -39,6 +39,7 @@ const crypto = require('crypto');
 
 // ---- load the real database class ----
 const { SistemiGenitDatabase } = require('./electron/database');
+global.__SG_ALLOW_INJECT__ = true; // test environment: enable the (dev-only) failure-injection handler
 const { registerAtomicHandlers, hashPassword, verifyPassword } = require('./electron/ipc/atomic');
 
 // ---- mock ipcMain ----

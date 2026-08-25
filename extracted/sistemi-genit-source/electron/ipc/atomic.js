@@ -31,35 +31,7 @@ function round2(n) { n = Number(n) || 0; return Math.round((n + Number.EPSILON) 
 // self-contained for the auth:login / auth:hashPassword handlers.
 // Format: scrypt$N$r$p$saltHex$hashHex  (self-describing, upgradeable).
 // ---------------------------------------------------------------------------
-const SCRYPT_N = 16384, SCRYPT_r = 8, SCRYPT_p = 1, SCRYPT_KEYLEN = 32;
-
-function hashPassword(plain) {
-  if (typeof plain !== 'string' || plain.length === 0) return null;
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.scryptSync(plain, salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_r, p: SCRYPT_p, maxmem: 128 * 1024 * 1024 });
-  return 'scrypt$' + SCRYPT_N + '$' + SCRYPT_r + '$' + SCRYPT_p + '$' + salt.toString('hex') + '$' + hash.toString('hex');
-}
-
-function verifyPassword(plain, stored) {
-  if (typeof plain !== 'string' || typeof stored !== 'string') return false;
-  if (stored.startsWith('scrypt$')) {
-    const parts = stored.split('$');
-    if (parts.length !== 6) return false;
-    const N = parseInt(parts[1], 10), r = parseInt(parts[2], 10), p = parseInt(parts[3], 10);
-    const salt = Buffer.from(parts[4], 'hex');
-    const expected = Buffer.from(parts[5], 'hex');
-    try {
-      const hash = crypto.scryptSync(plain, salt, expected.length, { N, r, p, maxmem: 128 * 1024 * 1024 });
-      if (hash.length !== expected.length) return false;
-      return crypto.timingSafeEqual(hash, expected);
-    } catch (e) { return false; }
-  }
-  return false;
-}
-
-function isHashedPassword(stored) {
-  return typeof stored === 'string' && stored.startsWith('scrypt$');
-}
+const { hashPassword, verifyPassword, isHashedPassword } = require('../passwords');
 
 // Convert a renderer item's entered/display qty into base-unit qty using the
 // unit multiplier. Falls back to the explicit qty if no multiplier.
@@ -109,13 +81,20 @@ function registerAtomicHandlers(ipcMain, db, logError) {
   // KEY to products(id), so any stock op on such a product used to roll back
   // with "FOREIGN KEY constraint failed". Auto-create a minimal products row
   // so stock operations are self-healing.
+  function kvProductName(id) {
+    try {
+      const kv = db.readValue('products/' + id);
+      return kv && (kv.name || kv.emri) ? String(kv.name || kv.emri) : '';
+    } catch (e) { return ''; }
+  }
+
   function ensureProductRow(productId, name) {
     const id = String(productId || '');
     if (!id) return;
     const ex = db.raw().prepare('SELECT id FROM products WHERE id = ?').get(id);
     if (!ex) {
       db.raw().prepare('INSERT INTO products (id, name, created_at, updated_at) VALUES (?,?,?,?)')
-        .run(id, String(name || id), nowIso(), nowIso());
+        .run(id, String(name || kvProductName(id) || id), nowIso(), nowIso());
     }
   }
 
@@ -866,6 +845,10 @@ function registerAtomicHandlers(ipcMain, db, logError) {
   // =========================================================================
   ipcMain.handle('system:injectFailure', (event, payload) => {
     try {
+      // Audit v1.1.1: test-only backdoor must never run in production builds.
+      if (!global.__SG_ALLOW_INJECT__) {
+        return { success: false, message: 'Handler testues i çaktivizuar jashtë mjedisit të testimit.' };
+      }
       const { op, failAfter } = payload || {};
       const args = payload;
       const failAt = Number(failAfter) || 0;

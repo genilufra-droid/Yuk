@@ -65,6 +65,12 @@ jobs:
             npm install
           }
 
+      - name: Run atomic-transaction test suite
+        shell: pwsh
+        run: |
+          Set-Location $env:PROJECT_DIR
+          node test-suite-v3.js
+
       - name: Build Windows Setup EXE
         shell: pwsh
         env:

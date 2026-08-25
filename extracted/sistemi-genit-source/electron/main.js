@@ -23,6 +23,16 @@ const { registerAtomicHandlers } = require('./ipc/atomic');
 
 const isDev = process.argv.includes('--dev') || !!process.env.SG_DEV;
 
+// Audit v1.1.1: Content-Security-Policy. The app is fully offline; this blocks
+// any remote code/resource load as defense-in-depth. Inline script/style stay
+// allowed because the built index.html legitimately uses inline blocks.
+app.whenReady().then(() => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'";
+    callback({ responseHeaders: Object.assign({}, details.responseHeaders, { 'Content-Security-Policy': [csp] }) });
+  });
+});
+
 // global handle to the database instance and the main window
 let db = null;
 let mainWindow = null;
@@ -54,6 +64,7 @@ function initDatabase() {
   db = new SistemiGenitDatabase(dbPath);
   // Register all atomic main-process transaction handlers (sales, purchases,
   // PO receiving, Fletë Hyrje/Dalje, returns, corrections, transfers, auth).
+  global.__SG_ALLOW_INJECT__ = isDev; // audit v1.1.1: failure-injection only in dev
   registerAtomicHandlers(ipcMain, db, logError);
 }
 
@@ -434,10 +445,13 @@ ipcMain.handle('backup:restore', async (event) => {
     try {
       const tmp = new Database(src, { readonly: true });
       const r = tmp.prepare("PRAGMA quick_check").get();
+      let tables = [];
+      try { tables = tmp.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x => x.name); } catch (e) { tables = []; }
       tmp.close();
-      valid = r && r['quick_check'] === 'ok';
+      // Audit v1.1.1: also require the expected schema, not just a valid SQLite file.
+      valid = !!(r && r['quick_check'] === 'ok') && tables.includes('kv_nodes') && tables.includes('sales');
     } catch (e) { valid = false; }
-    if (!valid) return { success: false, message: 'Backup i pavlefshëm ose i dëmtuar.' };
+    if (!valid) return { success: false, message: 'Backup i pavlefshëm, i dëmtuar, ose nuk është databazë e Sistemi Genit.' };
 
     // Never overwrite the active DB directly: copy to a temp, close active,
     // replace, reopen.
