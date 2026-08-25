@@ -1024,7 +1024,7 @@ function openSaleDocument(sale, mode, autoPrint) {
   }
   return openHtmlDocument(title, html, !!autoPrint);
 }
-function buildMovementWarehouseHtml(movement, product) {
+function buildMovementWarehouseHtml(movement, product, docNoOverride) {
   if (!movement) return '';
   const escL = typeof esc === 'function' ? esc : function (s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1041,7 +1041,7 @@ function buildMovementWarehouseHtml(movement, product) {
   const name = p.name || movement.productName || movement.productId || '-';
   const cost = Number(movement.unitCost || p.cost || 0);
   const val = Number(qty || 0) * cost;
-  const doc = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
+  const doc = docNoOverride || 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
   const serial = (String(docNo || '').replace(/[^0-9]/g, '') || '0').padStart(7, '0').slice(-7);
   let body = '<tr><td>1</td><td style="text-align:left">' + escL(name) + '</td><td>' + escL(unit) + '</td><td>' + escL(fQ(qty)) + '</td><td>' + (cost ? escL(fL(cost)) : '') + '</td><td>' + (val ? escL(fL(val)) : '') + '</td></tr>';
   for (let i = 1; i < 21; i += 1) {
@@ -1049,8 +1049,26 @@ function buildMovementWarehouseHtml(movement, product) {
   }
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline"></div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(doc) + '</b><b>Dt: ' + escL(reportDateOnly(movement.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(movement.reference || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
-function openMovementDocument(movement, product, autoPrint) {
-  openHtmlDocument('Fletë Dalje', buildMovementWarehouseHtml(movement, product), !!autoPrint);
+async function openMovementDocument(movement, product, autoPrint) {
+  if (!movement) return;
+  const autoNo = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
+  let docNo = autoNo;
+  if (window.Swal && !autoPrint) {
+    const r = await Swal.fire({
+      icon: 'question',
+      title: 'Numri i Fletës së Daljes',
+      html: 'Automatik (<b>' + autoNo + '</b>), ose shkruaje manualisht:',
+      input: 'text',
+      inputValue: autoNo,
+      showCancelButton: true,
+      confirmButtonText: 'Vazhdo',
+      cancelButtonText: 'Anulo',
+      confirmButtonColor: '#714B67'
+    });
+    if (!r.isConfirmed) return;
+    docNo = String(r.value || '').trim() || autoNo;
+  }
+  openHtmlDocument('Fletë Dalje ' + docNo, buildMovementWarehouseHtml(movement, product, docNo), !!autoPrint);
 }
 function printWithMode(mode, sale) {
   const s = sale || __lastDocSale;
@@ -6542,11 +6560,21 @@ function FleteDaljePrint({
   product
 }) {
   if (!movement) return null;
-  return React.createElement("div", {
-    dangerouslySetInnerHTML: {
-      __html: buildMovementWarehouseHtml(movement, product)
-    }
-  });
+  try {
+    return React.createElement("div", {
+      dangerouslySetInnerHTML: {
+        __html: buildMovementWarehouseHtml(movement, product)
+      }
+    });
+  } catch (e) {
+    console.error('fd crash', e);
+    return React.createElement("pre", {
+      style: {
+        color: '#c00',
+        fontSize: 11
+      }
+    }, 'Gabim: ' + String(e && e.message || e));
+  }
 }
 function StockView({
   user,
@@ -7357,21 +7385,41 @@ function FleteDaljeSalePrint({
   sale
 }) {
   if (!sale) return null;
-  return React.createElement("div", {
-    dangerouslySetInnerHTML: {
-      __html: buildWarehouseHtml(sale)
-    }
-  });
+  try {
+    return React.createElement("div", {
+      dangerouslySetInnerHTML: {
+        __html: buildWarehouseHtml(sale)
+      }
+    });
+  } catch (e) {
+    console.error('fd crash', e);
+    return React.createElement("pre", {
+      style: {
+        color: '#c00',
+        fontSize: 11
+      }
+    }, 'Gabim: ' + String(e && e.message || e));
+  }
 }
 function FleteHyrjePrint({
   receipt
 }) {
   if (!receipt) return null;
-  return React.createElement("div", {
-    dangerouslySetInnerHTML: {
-      __html: buildWarehouseInHtml(receipt)
-    }
-  });
+  try {
+    return React.createElement("div", {
+      dangerouslySetInnerHTML: {
+        __html: buildWarehouseInHtml(receipt)
+      }
+    });
+  } catch (e) {
+    console.error('fh crash', e);
+    return React.createElement("pre", {
+      style: {
+        color: '#c00',
+        fontSize: 11
+      }
+    }, 'Gabim: ' + String(e && e.message || e));
+  }
 }
 function WarehouseReceiptInOverlay({
   receipt,
@@ -13226,8 +13274,24 @@ function PurchaseOrdersView({
       confirmButtonColor: '#714B67'
     });
     if (!conf.isConfirmed) return;
+    const autoNo = 'FH-' + String(po.poNumber || Date.now()).replace(/[^0-9A-Z]/gi, '').slice(-6);
+    const numRes = await Swal.fire({
+      icon: 'question',
+      title: 'Numri i Fletës së Hyrjes',
+      html: 'Automatik nga porosia e blerjes (<b>' + autoNo + '</b>), ose shkruaje manualisht:',
+      input: 'text',
+      inputValue: autoNo,
+      showCancelButton: true,
+      confirmButtonText: 'Vazhdo',
+      cancelButtonText: 'Anulo',
+      confirmButtonColor: '#714B67'
+    });
+    if (!numRes.isConfirmed) {
+      setLoad('');
+      return;
+    }
+    const docNo = String(numRes.value || '').trim() || autoNo;
     setLoad('Duke krijuar Fletë Hyrje...');
-    const docNo = 'FH-' + (po.poNumber || Date.now()).toString().slice(-8);
     const receipt = {
       docNo,
       poId: po.id,
@@ -16392,7 +16456,15 @@ class ErrorBoundary extends React.Component {
         fontSize: 40,
         color: 'var(--danger)'
       }
-    }), React.createElement("h2", null, "Something broke"), React.createElement("button", {
+    }), React.createElement("h2", null, "Something broke"), React.createElement("pre", {
+      style: {
+        maxWidth: '70vw',
+        whiteSpace: 'pre-wrap',
+        fontSize: 11,
+        color: '#a33',
+        textAlign: 'left'
+      }
+    }, String(this.state.err && this.state.err.message || this.state.err || '')), React.createElement("button", {
       className: "btn btn-primary",
       onClick: () => location.reload()
     }, React.createElement("i", {

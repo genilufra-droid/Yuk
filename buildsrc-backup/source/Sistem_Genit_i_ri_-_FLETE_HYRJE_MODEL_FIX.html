@@ -5105,7 +5105,7 @@ function openSaleDocument(sale, mode, autoPrint) {
 }
 
 
-function buildMovementWarehouseHtml(movement, product) {
+function buildMovementWarehouseHtml(movement, product, docNoOverride) {
   if (!movement) return '';
   const escL = (typeof esc === 'function') ? esc : function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   const fL = (typeof fmtLek === 'function') ? fmtLek : function(n){return Number(n||0).toFixed(2);};
@@ -5116,7 +5116,7 @@ function buildMovementWarehouseHtml(movement, product) {
   const name = p.name || movement.productName || movement.productId || '-';
   const cost = Number(movement.unitCost || p.cost || 0);
   const val = Number(qty || 0) * cost;
-  const doc = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
+  const doc = docNoOverride || ('FD-' + String(movement.id || '').slice(-6).toUpperCase());
   const serial = (String(docNo || '').replace(/[^0-9]/g,'') || '0').padStart(7,'0').slice(-7);
   let body = '<tr><td>1</td><td style="text-align:left">' + escL(name) + '</td><td>' + escL(unit) + '</td><td>' + escL(fQ(qty)) + '</td><td>' + (cost ? escL(fL(cost)) : '') + '</td><td>' + (val ? escL(fL(val)) : '') + '</td></tr>';
   for (let i = 1; i < 21; i += 1) {
@@ -5134,8 +5134,26 @@ function buildMovementWarehouseHtml(movement, product) {
   '</div>';
 }
 
-function openMovementDocument(movement, product, autoPrint) {
-  openHtmlDocument('Fletë Dalje', buildMovementWarehouseHtml(movement, product), !!autoPrint);
+async function openMovementDocument(movement, product, autoPrint) {
+  if (!movement) return;
+  const autoNo = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
+  let docNo = autoNo;
+  if (window.Swal && !autoPrint) {
+    const r = await Swal.fire({
+      icon: 'question',
+      title: 'Numri i Fletës së Daljes',
+      html: 'Automatik (<b>' + autoNo + '</b>), ose shkruaje manualisht:',
+      input: 'text',
+      inputValue: autoNo,
+      showCancelButton: true,
+      confirmButtonText: 'Vazhdo',
+      cancelButtonText: 'Anulo',
+      confirmButtonColor: '#714B67'
+    });
+    if (!r.isConfirmed) return;
+    docNo = String(r.value || '').trim() || autoNo;
+  }
+  openHtmlDocument('Fletë Dalje ' + docNo, buildMovementWarehouseHtml(movement, product, docNo), !!autoPrint);
 }
 
 function printWithMode(mode, sale) {
@@ -7955,7 +7973,8 @@ function StockAdjustModal({ products, movements, onClose, onSave }) {
 
 function FleteDaljePrint({ movement, product }) {
   if (!movement) return null;
-  return <div dangerouslySetInnerHTML={{ __html: buildMovementWarehouseHtml(movement, product) }} />;
+  try { return <div dangerouslySetInnerHTML={{ __html: buildMovementWarehouseHtml(movement, product) }} />; }
+  catch (e) { console.error('fd crash', e); return <pre style={{color:'#c00',fontSize:11}}>{'Gabim: ' + String(e && e.message || e)}</pre>; }
 }
 
 function StockView({ user, role, setActiveMenu }) {
@@ -8481,12 +8500,14 @@ function A4InvoicePrint({ sale }) {
 
 function FleteDaljeSalePrint({ sale }) {
   if (!sale) return null;
-  return <div dangerouslySetInnerHTML={{ __html: buildWarehouseHtml(sale) }} />;
+  try { return <div dangerouslySetInnerHTML={{ __html: buildWarehouseHtml(sale) }} />; }
+  catch (e) { console.error('fd crash', e); return <pre style={{color:'#c00',fontSize:11}}>{'Gabim: ' + String(e && e.message || e)}</pre>; }
 }
 
 function FleteHyrjePrint({ receipt }) {
   if (!receipt) return null;
-  return <div dangerouslySetInnerHTML={{ __html: buildWarehouseInHtml(receipt) }} />;
+  try { return <div dangerouslySetInnerHTML={{ __html: buildWarehouseInHtml(receipt) }} />; }
+  catch (e) { console.error('fh crash', e); return <pre style={{color:'#c00',fontSize:11}}>{'Gabim: ' + String(e && e.message || e)}</pre>; }
 }
 
 function WarehouseReceiptInOverlay({ receipt, onClose }) {
@@ -10562,10 +10583,24 @@ function PurchaseOrdersView({ user, role, setActiveMenu }) {
     });
     if (!conf.isConfirmed) return;
 
+    const autoNo = 'FH-' + String(po.poNumber || Date.now()).replace(/[^0-9A-Z]/gi, '').slice(-6);
+    const numRes = await Swal.fire({
+      icon: 'question',
+      title: 'Numri i Fletës së Hyrjes',
+      html: 'Automatik nga porosia e blerjes (<b>' + autoNo + '</b>), ose shkruaje manualisht:',
+      input: 'text',
+      inputValue: autoNo,
+      showCancelButton: true,
+      confirmButtonText: 'Vazhdo',
+      cancelButtonText: 'Anulo',
+      confirmButtonColor: '#714B67'
+    });
+    if (!numRes.isConfirmed) { setLoad(''); return; }
+    const docNo = String(numRes.value || '').trim() || autoNo;
+
     setLoad('Duke krijuar Fletë Hyrje...');
 
     // Create receipt record
-    const docNo = 'FH-' + (po.poNumber || Date.now()).toString().slice(-8);
     const receipt = {
       docNo,
       poId: po.id,
@@ -12354,6 +12389,7 @@ class ErrorBoundary extends React.Component {
       <div className="login-container"><div className="login-box">
         <i className="fas fa-triangle-exclamation" style={{fontSize: 40, color: 'var(--danger)'}}></i>
         <h2>Something broke</h2>
+        <pre style={{maxWidth:'70vw',whiteSpace:'pre-wrap',fontSize:11,color:'#a33',textAlign:'left'}}>{String(this.state.err && this.state.err.message || this.state.err || '')}</pre>
         <button className="btn btn-primary" onClick={() => location.reload()}><i className="fas fa-rotate"></i> Reload</button>
       </div></div>
     );
