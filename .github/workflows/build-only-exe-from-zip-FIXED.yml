@@ -69,6 +69,9 @@ jobs:
         shell: pwsh
         run: |
           Set-Location $env:PROJECT_DIR
+          # postinstall rebuilt better-sqlite3 for Electron's ABI; rebuild it
+          # back for Node so the headless test suite can load it.
+          npm rebuild better-sqlite3
           node test-suite-v3.js
 
       - name: Build Windows Setup EXE
@@ -77,6 +80,9 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           Set-Location $env:PROJECT_DIR
+
+          # tests rebuilt the native module for Node; switch back to Electron ABI
+          npx electron-builder install-app-deps
 
           npm run build:frontend
 
