@@ -1,0 +1,70 @@
+{
+  "name": "sistemi-genit",
+  "version": "1.0.1",
+  "description": "Sistemi Genit - ERP/POS desktop application (Electron + SQLite)",
+  "author": "Mariglen Myftari",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:frontend": "node build/build-frontend.js",
+    "build": "npm run build:frontend && electron-builder --win",
+    "build:portable": "npm run build:frontend && electron-builder --win portable",
+    "pack": "npm run build:frontend && electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-react": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "al.sistemigenit.desktop",
+    "productName": "Sistemi Genit",
+    "copyright": "Copyright © 2026 Mariglen Myftari",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "vendor/**/*",
+      "assets/**/*",
+      "database/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "Sistemi-Genit-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sistemi Genit",
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "allowElevation": true
+    },
+    "portable": {
+      "artifactName": "Sistemi-Genit-Portable-${version}.exe"
+    }
+  }
+}
