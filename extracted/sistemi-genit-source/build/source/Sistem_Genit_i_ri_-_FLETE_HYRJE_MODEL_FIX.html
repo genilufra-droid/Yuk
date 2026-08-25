@@ -5116,17 +5116,17 @@ function buildMovementWarehouseHtml(movement, product, docNoOverride) {
   const name = p.name || movement.productName || movement.productId || '-';
   const cost = Number(movement.unitCost || p.cost || 0);
   const val = Number(qty || 0) * cost;
-  const doc = docNoOverride || ('FD-' + String(movement.id || '').slice(-6).toUpperCase());
-  const serial = (String(docNo || '').replace(/[^0-9]/g,'') || '0').padStart(7,'0').slice(-7);
+  const isIn = String(movement.type || '').toLowerCase() === 'in';
+  const doc = docNoOverride || ((isIn ? 'FH-' : 'FD-') + String(movement.id || '').slice(-6).toUpperCase());
+  const serial = (String(doc || '').replace(/[^0-9]/g,'') || '0').padStart(7,'0').slice(-7);
   let body = '<tr><td>1</td><td style="text-align:left">' + escL(name) + '</td><td>' + escL(unit) + '</td><td>' + escL(fQ(qty)) + '</td><td>' + (cost ? escL(fL(cost)) : '') + '</td><td>' + (val ? escL(fL(val)) : '') + '</td></tr>';
   for (let i = 1; i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' +
     '<div class="fd-head">' +
-      '<div><div class="fd-topline"></div><div class="fd-topline"></div></div>' +
-      '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(doc) + '</b><b>Dt: ' + escL(reportDateOnly(movement.createdAt || nowIso())) + '</b></div></div>' +
-      '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(movement.reference || '') + '</div></div>' +
+      '<div><div class="fd-title">' + (isIn ? 'FLETË - HYRJE' : 'FLETË DALJE') + '</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(doc) + '</b><b>Dt: ' + escL(reportDateOnly(movement.createdAt || nowIso())) + '</b></div></div>' +
+      '<div><b>' + (isIn ? 'Adresa nga vjen malli' : 'Adresa ku shkon malli') + '</b><div class="fd-topline" style="margin-top:8px">' + escL(movement.reference || movement.note || '') + '</div></div>' +
     '</div>' +
     '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' +
     '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' +
@@ -5136,7 +5136,8 @@ function buildMovementWarehouseHtml(movement, product, docNoOverride) {
 
 async function openMovementDocument(movement, product, autoPrint) {
   if (!movement) return;
-  const autoNo = 'FD-' + String(movement.id || '').slice(-6).toUpperCase();
+  const isIn = String(movement.type || '').toLowerCase() === 'in';
+  const autoNo = (isIn ? 'FH-' : 'FD-') + String(movement.id || '').slice(-6).toUpperCase();
   let docNo = autoNo;
   if (window.Swal && !autoPrint) {
     const r = await Swal.fire({
@@ -5153,7 +5154,7 @@ async function openMovementDocument(movement, product, autoPrint) {
     if (!r.isConfirmed) return;
     docNo = String(r.value || '').trim() || autoNo;
   }
-  openHtmlDocument('Fletë Dalje ' + docNo, buildMovementWarehouseHtml(movement, product, docNo), !!autoPrint);
+  openHtmlDocument((isIn ? 'Fletë Hyrje ' : 'Fletë Dalje ') + docNo, buildMovementWarehouseHtml(movement, product, docNo), !!autoPrint);
 }
 
 function printWithMode(mode, sale) {
@@ -7992,6 +7993,11 @@ function StockView({ user, role, setActiveMenu }) {
   const [showAdjust, setShowAdjust] = useState(false);
   const [printMove, setPrintMove] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    const fn = () => setReloadKey(k => k + 1);
+    window.addEventListener('erp-data-changed', fn);
+    return () => window.removeEventListener('erp-data-changed', fn);
+  }, []);
   const [load, setLoad] = useState('');
   const tableInstanceRef = useRef(null);
   useDtLiveSearch(tableInstanceRef, qSearch);
@@ -9156,6 +9162,14 @@ function SalesHistoryView({ user, role }) {
 
   useEffect(() => {
     if (loading) return;
+    if (viewMode !== 'list') {
+      if (tableInstanceRef.current) { try { tableInstanceRef.current.destroy(); } catch (e) {} tableInstanceRef.current = null; }
+      return;
+    }
+    if (!document.getElementById('salesTable')) return;
+    if (tableInstanceRef.current) {
+      try { if (!document.contains(tableInstanceRef.current.table().node())) { tableInstanceRef.current.destroy(); tableInstanceRef.current = null; } } catch (e) { tableInstanceRef.current = null; }
+    }
     let table = tableInstanceRef.current;
     if (table) {
       table.clear().rows.add(displaySales).draw(false);
@@ -9193,7 +9207,7 @@ function SalesHistoryView({ user, role }) {
       if (action === 'view') setViewSale(byId[id] || rowData);
       else if (action === 'return') setReturnSaleId(id);
     });
-  }, [loading, displaySales, role, facetPay, facetStatus]);
+  }, [loading, displaySales, role, facetPay, facetStatus, viewMode]);
 
   useEffect(() => () => {
     if (tableInstanceRef.current) { try { tableInstanceRef.current.destroy(); tableInstanceRef.current = null; } catch (e) {} }
@@ -10498,6 +10512,14 @@ function PurchaseOrdersView({ user, role, setActiveMenu }) {
 
   useEffect(() => {
     if (loading) return;
+    if (viewMode !== 'list') {
+      if (tableRef.current) { try { tableRef.current.destroy(); } catch (e) {} tableRef.current = null; }
+      return;
+    }
+    if (!document.getElementById('poTable')) return;
+    if (tableRef.current) {
+      try { if (!document.contains(tableRef.current.table().node())) { tableRef.current.destroy(); tableRef.current = null; } } catch (e) { tableRef.current = null; }
+    }
     let table = tableRef.current;
     if (table) { table.clear().rows.add(displayPOs).draw(false); }
     else {
@@ -10540,7 +10562,7 @@ function PurchaseOrdersView({ user, role, setActiveMenu }) {
         else exportPurchaseXlsx(po, sup);
       }
     });
-  }, [loading, displayPOs, role]);
+  }, [loading, displayPOs, role, viewMode]);
 
   useEffect(() => () => {
     if (tableRef.current) { try { tableRef.current.destroy(); tableRef.current = null; } catch (e) {} }
@@ -10775,6 +10797,11 @@ function WarehouseReceiptsInView({ user, role }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  useEffect(() => {
+    const fn = () => setReloadKey(k => k + 1);
+    window.addEventListener('erp-data-changed', fn);
+    return () => window.removeEventListener('erp-data-changed', fn);
+  }, []);
   const { loading, data, err } = useFetch(() => fbGetWarehouseReceiptsIn(), [reloadKey]);
   const receipts = useMemo(() => (data && data.success ? data.data : []), [data]);
   const filtered = useMemo(() => {

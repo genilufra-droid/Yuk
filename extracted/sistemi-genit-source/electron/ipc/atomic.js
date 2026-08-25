@@ -104,8 +104,24 @@ function registerAtomicHandlers(ipcMain, db, logError) {
     return id;
   }
 
+  // Legacy databases may hold products only in kv_nodes (Firebase-style) and
+  // never in the relational `products` table. warehouse_stock has a FOREIGN
+  // KEY to products(id), so any stock op on such a product used to roll back
+  // with "FOREIGN KEY constraint failed". Auto-create a minimal products row
+  // so stock operations are self-healing.
+  function ensureProductRow(productId, name) {
+    const id = String(productId || '');
+    if (!id) return;
+    const ex = db.raw().prepare('SELECT id FROM products WHERE id = ?').get(id);
+    if (!ex) {
+      db.raw().prepare('INSERT INTO products (id, name, created_at, updated_at) VALUES (?,?,?,?)')
+        .run(id, String(name || id), nowIso(), nowIso());
+    }
+  }
+
   // Upsert warehouse_stock for a product/warehouse pair.
   function adjustWarehouseStock(productId, warehouse, deltaQty) {
+    ensureProductRow(productId);
     const wh = String(warehouse || 'Magazina Kryesore');
     const delta = Number(deltaQty) || 0;
     db.raw().prepare(
@@ -115,6 +131,7 @@ function registerAtomicHandlers(ipcMain, db, logError) {
   }
 
   function setWarehouseStock(productId, warehouse, stock) {
+    ensureProductRow(productId);
     const wh = String(warehouse || 'Magazina Kryesore');
     const s = Number(stock) || 0;
     db.raw().prepare(
@@ -445,8 +462,16 @@ function registerAtomicHandlers(ipcMain, db, logError) {
 
       const result = db.atomic(() => {
         // --- Double-post guard (authoritative, inside the transaction) ---
-        const cur = db.raw().prepare('SELECT status, po_number FROM purchase_orders WHERE id = ?').get(po.id);
-        if (!cur) throw new Error('Porosia nuk u gjet');
+        let cur = db.raw().prepare('SELECT status, po_number FROM purchase_orders WHERE id = ?').get(po.id);
+        if (!cur) {
+          // Legacy PO exists only in kv_nodes: create the relational header
+          // inside this transaction so the receive can proceed (self-heal).
+          db.raw().prepare(
+            'INSERT INTO purchase_orders (id, po_number, supplier_id, supplier_name, status, total, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)'
+          ).run(String(po.id), String(po.poNumber || ''), String(po.supplierId || ''), String(po.supplierName || ''),
+            String(po.status || 'ordered'), Number(po.total || 0), String(po.createdBy || ''), String(po.createdAt || now));
+          cur = { status: String(po.status || 'ordered'), po_number: String(po.poNumber || '') };
+        }
         if (cur.status === 'received' || cur.status === 'cancelled') {
           throw new Error('Kjo porosi është marrë në stok tashmë (status: ' + cur.status + '). Postim i dyfishtë nuk lejohet.');
         }
