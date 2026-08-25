@@ -596,6 +596,7 @@ function nivfFor(id) {
 function saleInvoiceTypeOfficial(sale) {
   return salePaymentLabel(sale) === 'Kredi' ? 'Faturë pa para' : 'Fatura e parave të gatshme';
 }
+const FATURE_A4_CSS = '<style>' + '.doc-a4{width:210mm;max-width:100%;padding:10mm;box-sizing:border-box;font-size:10.5px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}' + '.doc-a4 h1{text-align:center;font-size:20px;margin:0 0 8px;letter-spacing:1px}' + '.doc-a4 .box{border:1.4px solid #111;margin:0 0 6px}' + '.doc-a4 .r{display:grid;grid-template-columns:42% 58%;border-bottom:1px solid #111}.doc-a4 .r:last-child{border-bottom:0}.doc-a4 .r>div{padding:4px 6px}' + '.doc-a4 table{width:100%;border-collapse:collapse;font-size:9px;margin-top:6px}' + '.doc-a4 th,.doc-a4 td{border:1px solid #111;padding:3px;text-align:center}.doc-a4 th{background:#eee}.doc-a4 td.l{text-align:left}' + '.doc-a4 .tlabel{text-align:right}' + '.doc-a4 .b{font-weight:700}' + '.doc-a4 .vathead{margin:10px 0 2px;font-size:9.5px}' + '.doc-a4 .vat{width:70%;margin-top:2px}' + '.doc-a4 .vat td.rate{background:#cfe0ef}' + '.doc-a4 .fl{margin:6px 0 0;font-size:9.5px}' + '.doc-a4 .fl span{margin-left:10px}' + '</style>';
 function buildFatureHtml(d) {
   const escL = typeof esc === 'function' ? esc : function (s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -610,7 +611,7 @@ function buildFatureHtml(d) {
   const vat = (d.vatRows || []).map(function (r) {
     return '<tr><td class="rate">' + escL(f2(r.rate)) + '</td><td>' + escL(f2(r.base)) + '</td><td>' + escL(f2(r.vat)) + '</td></tr>';
   }).join('');
-  return '<div class="sheet doc-a4">' + '<h1>FATURË</h1>' + '<div class="box">' + '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.seller.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit :</b></div><div>' + escL(d.seller.nipt || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div>Data dhe ora e lëshimit të faturës:</div><div>' + escL(fatureDateFmt(d.issueIso)) + '</div></div>' + '<div class="r"><div>Numri i Faturës:</div><div>' + escL(d.invoiceNo || '') + '</div></div>' + '<div class="r"><div>Operatori:</div><div>' + escL(d.operator || '') + '</div></div>' + '<div class="r"><div>Kodin e vendit të ushtrimit të veprimtarisë:</div><div>' + escL(d.unitCode || '') + '</div></div>' + '<div class="r"><div>Lloji i Faturës:</div><div>' + escL(d.typeLabel || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div><b>Blerësi:</b></div><div>' + escL(d.buyer.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.buyer.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit:</b></div><div>' + escL(d.buyer.nipt || '') + '</div></div></div>' + '<table><thead><tr><th>Përshkrimi i Mallit ose Shërbimit</th><th>Njësia e Matjes</th><th>Sasia</th><th>Cmimi për njësi pa tvsh</th><th>Zbritje %</th><th>Norma e TVSH</th><th>Vlera pa TVSH (sasi x çmimi)</th><th>TVSH (Vlera)</th><th>Vlera Totale</th></tr></thead><tbody>' + rows + totRow('Vlera pa TVSH', d.subtotal, false) + totRow('Vlera totale e TVSH-së', d.vatTotal, false) + totRow('Totali per tu paguar (LEK)', d.grandTotal, true) + '</tbody></table>' + '<p class="vathead">Shpërndarja e TVSH-së</p>' + '<table class="vat"><thead><tr><th>Norma e TVSH-se</th><th>Baza e tatueshme (LEK)</th><th>Vlera e TVSH-se(LEK)</th></tr></thead><tbody>' + vat + '</tbody></table>' + '<p class="fl">Data dhe ora e kryerjes së pagesës:<span>' + escL(payDateFmt(d.payIso)) + '</span></p>' + '<p class="fl">Numri i sigurisë së lëshuesit të faturës (NSLF):<span>' + escL(d.nslf || '') + '</span></p>' + '<p class="fl">Numri identifikues të veçantë të faturës (NIVF):<span>' + escL(d.nivf || '') + '</span></p>' + '</div>';
+  return FATURE_A4_CSS + '<div class="sheet doc-a4">' + '<h1>FATURË</h1>' + '<div class="box">' + '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.seller.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit :</b></div><div>' + escL(d.seller.nipt || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div>Data dhe ora e lëshimit të faturës:</div><div>' + escL(fatureDateFmt(d.issueIso)) + '</div></div>' + '<div class="r"><div>Numri i Faturës:</div><div>' + escL(d.invoiceNo || '') + '</div></div>' + '<div class="r"><div>Operatori:</div><div>' + escL(d.operator || '') + '</div></div>' + '<div class="r"><div>Kodin e vendit të ushtrimit të veprimtarisë:</div><div>' + escL(d.unitCode || '') + '</div></div>' + '<div class="r"><div>Lloji i Faturës:</div><div>' + escL(d.typeLabel || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div><b>Blerësi:</b></div><div>' + escL(d.buyer.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.buyer.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit:</b></div><div>' + escL(d.buyer.nipt || '') + '</div></div></div>' + '<table><thead><tr><th>Përshkrimi i Mallit ose Shërbimit</th><th>Njësia e Matjes</th><th>Sasia</th><th>Cmimi për njësi pa tvsh</th><th>Zbritje %</th><th>Norma e TVSH</th><th>Vlera pa TVSH (sasi x çmimi)</th><th>TVSH (Vlera)</th><th>Vlera Totale</th></tr></thead><tbody>' + rows + totRow('Vlera pa TVSH', d.subtotal, false) + totRow('Vlera totale e TVSH-së', d.vatTotal, false) + totRow('Totali per tu paguar (LEK)', d.grandTotal, true) + '</tbody></table>' + '<p class="vathead">Shpërndarja e TVSH-së</p>' + '<table class="vat"><thead><tr><th>Norma e TVSH-se</th><th>Baza e tatueshme (LEK)</th><th>Vlera e TVSH-se(LEK)</th></tr></thead><tbody>' + vat + '</tbody></table>' + '<p class="fl">Data dhe ora e kryerjes së pagesës:<span>' + escL(payDateFmt(d.payIso)) + '</span></p>' + '<p class="fl">Numri i sigurisë së lëshuesit të faturës (NSLF):<span>' + escL(d.nslf || '') + '</span></p>' + '<p class="fl">Numri identifikues të veçantë të faturës (NIVF):<span>' + escL(d.nivf || '') + '</span></p>' + '</div>';
 }
 function saleFatureData(sale) {
   const items = (sale.items || []).map(function (it) {
@@ -7293,100 +7294,21 @@ function A4InvoicePrint({
   sale
 }) {
   if (!sale) return null;
-  const rows = sale.items || [];
-  const taxRows = saleTaxBreakdown(sale);
-  const disc = Number(sale.discount || 0);
-  return React.createElement("div", {
-    className: "a4-invoice-print"
-  }, React.createElement("div", {
-    className: "a4-title"
-  }, "FATUR\xCB"), React.createElement("div", {
-    className: "a4-box"
-  }, React.createElement("div", {
-    className: "a4-section-head"
-  }, "Shit\xEBsi"), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Shit\xEBsi:")), React.createElement("div", null, businessName())), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Adresa:")), React.createElement("div", null, businessAddress() || '—')), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Numri Unik i Identifikimit:")), React.createElement("div", null, businessNipt() || '—'))), React.createElement("div", {
-    className: "a4-box"
-  }, React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, "Data dhe ora e l\xEBshimit t\xEB fatur\xEBs:"), React.createElement("div", null, formatDateForDisplay(sale.createdAt || nowIso()))), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, "Numri i Fatur\xEBs:"), React.createElement("div", null, saleDocNo(sale))), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, "Operatori:"), React.createElement("div", null, saleOperatorCode(sale))), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, "Kodi i vendit t\xEB ushtrimit t\xEB veprimtaris\xEB:"), React.createElement("div", null, saleBusinessUnitCode(sale))), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, "Lloji i Fatur\xEBs:"), React.createElement("div", null, saleInvoiceTypeLabel(sale)))), React.createElement("div", {
-    className: "a4-box"
-  }, React.createElement("div", {
-    className: "a4-section-head"
-  }, "Bler\xEBsi"), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Bler\xEBsi:")), React.createElement("div", null, saleBuyerName(sale))), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Adresa:")), React.createElement("div", null, saleBuyerAddress(sale) || '—')), React.createElement("div", {
-    className: "a4-row"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "a4-label"
-  }, "Numri Unik i Identifikimit:")), React.createElement("div", null, saleBuyerNipt(sale) || '—'))), React.createElement("table", {
-    className: "a4-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "P\xEBrshkrimi i Mallit ose Sh\xEBrbimit"), React.createElement("th", null, "Nj\xEBsia e Matjes"), React.createElement("th", null, "Sasia"), React.createElement("th", null, "\xC7mimi p\xEBr nj\xEBsi pa TVSH"), React.createElement("th", null, "Zbritje"), React.createElement("th", null, "Norma e TVSH"), React.createElement("th", null, "Vlera pa TVSH"), React.createElement("th", null, "TVSH"), React.createElement("th", null, "Vlera Totale"))), React.createElement("tbody", null, rows.map((it, i) => React.createElement("tr", {
-    key: i
-  }, React.createElement("td", {
-    className: "left"
-  }, it.name), React.createElement("td", null, it.unitName || 'copë'), React.createElement("td", null, fmtQty(it.displayQty != null ? it.displayQty : it.qty)), React.createElement("td", null, fmtLek(it.unitSalePrice || it.netUnitPrice || it.price || 0)), React.createElement("td", null, fmtLek(0)), React.createElement("td", null, fmtLek(it.taxRate != null ? it.taxRate : CFG.taxRate || 0)), React.createElement("td", null, fmtLek(it.lineNet || 0)), React.createElement("td", null, fmtLek(it.lineTax || 0)), React.createElement("td", null, fmtLek(it.lineTotal != null ? it.lineTotal : Number(it.lineNet || 0) + Number(it.lineTax || 0))))))), React.createElement("table", {
-    className: "a4-totals"
-  }, React.createElement("tbody", null, React.createElement("tr", null, React.createElement("td", null, "Vlera pa TVSH"), React.createElement("td", null, fmtLek(sale.subtotal || 0))), disc > 0 && React.createElement("tr", null, React.createElement("td", null, "Zbritje"), React.createElement("td", null, fmtLek(disc))), React.createElement("tr", null, React.createElement("td", null, "Vlera totale e TVSH-s\xEB"), React.createElement("td", null, fmtLek(sale.tax || 0))), React.createElement("tr", {
-    className: "grand"
-  }, React.createElement("td", null, "Totali p\xEBr tu paguar (LEK)"), React.createElement("td", null, fmtLek(sale.total || 0))))), React.createElement("div", {
-    className: "a4-meta-line",
-    style: {
-      marginTop: '5mm',
-      fontWeight: 700
-    }
-  }, "Shp\xEBrndarja e TVSH-s\xEB"), React.createElement("table", {
-    className: "a4-vat"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Norma e TVSH-s\xEB"), React.createElement("th", null, "Baza e tatueshme (LEK)"), React.createElement("th", null, "Vlera e TVSH-s\xEB (LEK)"))), React.createElement("tbody", null, taxRows.map((r, i) => React.createElement("tr", {
-    key: i
-  }, React.createElement("td", null, fmtLek(r.rate)), React.createElement("td", null, fmtLek(r.net)), React.createElement("td", null, fmtLek(r.tax)))))), React.createElement("p", {
-    className: "a4-meta-line"
-  }, "Data dhe ora e kryerjes s\xEB pages\xEBs: ", formatDateForDisplay(sale.paidAt || sale.createdAt || nowIso())), React.createElement("p", {
-    className: "a4-meta-line"
-  }, "Numri i siguris\xEB s\xEB l\xEBshuesit t\xEB fatur\xEBs (NSLF): ", React.createElement("b", null, saleNslf(sale))), React.createElement("p", {
-    className: "a4-meta-line"
-  }, "Numri identifikues t\xEB ve\xE7ant\xEB t\xEB fatur\xEBs (NIVF): ", React.createElement("b", null, saleNivf(sale))), React.createElement("div", {
-    className: "a4-meta-line",
-    style: {
-      fontWeight: 700,
-      marginTop: '4mm'
-    }
-  }, "M\xEBnyr\xEBn e pages\xEBs:"), React.createElement("table", {
-    className: "a4-pay"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Lloji"), React.createElement("th", null, "Sasi (LEK)"))), React.createElement("tbody", null, React.createElement("tr", null, React.createElement("td", null, salePaymentLabel(sale) === 'Para' ? 'Llogari e transaksionit' : salePaymentLabel(sale)), React.createElement("td", null, fmtLek(sale.total || 0))))), React.createElement("div", {
-    className: "a4-sign"
-  }, React.createElement("div", null, React.createElement("div", {
-    className: "a4-sign-line"
-  }, "Shit\xEBsi")), React.createElement("div", null, React.createElement("div", {
-    className: "a4-sign-line"
-  }, "Bler\xEBsi")), React.createElement("div", null, React.createElement("div", {
-    className: "a4-sign-line"
-  }, "Transportuesi"))));
+  try {
+    return React.createElement("div", {
+      dangerouslySetInnerHTML: {
+        __html: buildA4Html(sale)
+      }
+    });
+  } catch (e) {
+    console.error('a4 crash', e);
+    return React.createElement("pre", {
+      style: {
+        color: '#c00',
+        fontSize: 11
+      }
+    }, 'Gabim: ' + String(e && e.message || e));
+  }
 }
 function FleteDaljeSalePrint({
   sale
