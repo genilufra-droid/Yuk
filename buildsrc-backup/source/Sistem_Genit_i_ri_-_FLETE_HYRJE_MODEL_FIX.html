@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.2.0'
+      initializedVersion: '1.2.1'
     };
 
     try {
@@ -4933,6 +4933,19 @@ function alphaInPeriod(diso, fil) {
 function alphaVatSplit(total, rate) { rate = rate || 20; const tvsh = round2(Number(total || 0) * rate / (100 + rate)); return { tvsh: tvsh, net: round2(Number(total || 0) - tvsh) }; }
 
 function buildAlphaReport(id, fil, D) {
+  // apply cross-report filters (supplier, client, payment, warehouse, product, search)
+  D = Object.assign({}, D);
+  if (fil.supplierId) D.pos = (D.pos || []).filter(x => x.supplierId === fil.supplierId);
+  if (fil.customerId) D.sales = (D.sales || []).filter(x => x.customerId === fil.customerId || (x.customerName || 'Walk-in') === fil.customerId);
+  if (fil.pay) D.sales = (D.sales || []).filter(x => (x.paymentMethod || 'Para') === fil.pay);
+  if (fil.warehouse) D.moves = (D.moves || []).filter(v => (v.warehouse || 'Magazina Kryesore') === fil.warehouse);
+  if (fil.productId) { D.moves = (D.moves || []).filter(v => v.productId === fil.productId); D.products = (D.products || []).filter(pr => pr.id === fil.productId); }
+  if (fil.q) {
+    const q = String(fil.q).toLowerCase();
+    D.pos = (D.pos || []).filter(x => String(x.supplierName || '').toLowerCase().includes(q) || String(x.poNumber || '').toLowerCase().includes(q));
+    D.sales = (D.sales || []).filter(x => String(x.customerName || '').toLowerCase().includes(q) || String(x.invoiceNo || '').toLowerCase().includes(q));
+    D.products = (D.products || []).filter(pr => String(pr.name || '').toLowerCase().includes(q) || String(pr.sku || '').toLowerCase().includes(q));
+  }
   const F = [
     { label: 'Fillimi:', value: fil.from }, { label: 'Përfundimi:', value: fil.to },
     { label: 'Monedha:', value: 'LEK' }, { label: 'Kursi:', value: '1' }
@@ -4996,7 +5009,7 @@ function buildAlphaReport(id, fil, D) {
       rows.push({ kodi: pr.sku || pr.barcode || '', artikulli: pr.name || '', njesia: pr.unit || 'copë', sasia: qty, vlerab: qty * Number(pr.cost || 0), vleras: qty * Number(pr.price || 0) });
       totals.sasia += qty; totals.vlerab += qty * Number(pr.cost || 0); totals.vleras += qty * Number(pr.price || 0);
     });
-  } else {
+  } else if (id === 'Rap_ArkaDitariKlasik') {
     spec = { title: 'Ditari Klasik i arkës', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }],
       columns: [{ key: 'dt', label: 'Data' }, { key: 'pershkrimi', label: 'Përshkrimi', align: 'l' }, { key: 'hyrje', label: 'Hyrje', num: 1 }, { key: 'dalje', label: 'Dalje', num: 1 }, { key: 'balanca', label: 'Balanca', num: 1 }] };
     totals = { hyrje: 0, dalje: 0, balanca: 0 };
@@ -12706,6 +12719,11 @@ function AlphaReportsView({ user, role }) {
   const [to, setTo] = useState(today);
   const [sel, setSel] = useState('Rap_BlerjeRegjistriPermbledhes');
   const [productId, setProductId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [warehouse, setWarehouse] = useState('');
+  const [pay, setPay] = useState('');
+  const [q, setQ] = useState('');
   const { loading, data } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords()]), [from, to]);
   const pos = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
   const sales = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
@@ -12715,7 +12733,9 @@ function AlphaReportsView({ user, role }) {
   const receipts = useMemo(() => (data && data[5] && data[5].success ? data[5].data : []), [data]);
   const suppliers = useMemo(() => (data && data[6] && data[6].success ? data[6].data : []), [data]);
   const customers = useMemo(() => (data && data[7] && data[7].success ? data[7].data : []), [data]);
-  const built = useMemo(() => buildAlphaReport(sel, { from, to, productId }, { pos, sales, products, expenses, moves, receipts, suppliers, customers }), [sel, from, to, productId, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  const warehouses = useMemo(() => { const set = new Set(['Magazina Kryesore']); (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore')); return Array.from(set).sort(); }, [moves]);
+  const fil = { from, to, productId, customerId, supplierId, warehouse, pay, q };
+  const built = useMemo(() => buildAlphaReport(sel, fil, { pos, sales, products, expenses, moves, receipts, suppliers, customers }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
   const MODULES = [
     { label: 'BLERJE', items: [
       ['Rap_BlerjeRegjistriPermbledhes', 'Regjistri permbledhes i blerjeve'],
@@ -12777,7 +12797,6 @@ function AlphaReportsView({ user, role }) {
       ['Rap_KontLibriiMadh', 'Libri i madh'],
       ['Rap_kontKartelaLlogarive', 'Kartela e llogarive'] ] }
   ];
-  const kartela = String(sel).indexOf('KartelaArtikulli') >= 0;
   const doPdf = () => saveFaturePdf(built.html, sel + '.pdf');
   const doXlsx = () => {
     const API = window.sistemiGenitAPI;
@@ -12800,7 +12819,12 @@ function AlphaReportsView({ user, role }) {
         <div className="left" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ color: '#808080' }}>Nga</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} />
           <label style={{ color: '#808080' }}>Deri</label><input type="date" value={to} onChange={e => setTo(e.target.value)} />
-          {kartela && (<><label style={{ color: '#808080' }}>Artikulli</label><select value={productId} onChange={e => setProductId(e.target.value)} style={{ padding: 6, maxWidth: 220 }}><option value="">— të gjithë —</option>{products.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select></>)}
+          <input placeholder="Kërkim…" value={q} onChange={e => setQ(e.target.value)} style={{ padding: 6, width: 120 }} />
+          <select value={supplierId} onChange={e => setSupplierId(e.target.value)} style={{ padding: 6, maxWidth: 160 }} title="Furnitori"><option value="">Furnitor: të gjithë</option>{suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+          <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={{ padding: 6, maxWidth: 160 }} title="Klienti"><option value="">Klient: të gjithë</option>{customers.map(x => <option key={x.id} value={x.name}>{x.name}</option>)}</select>
+          <select value={productId} onChange={e => setProductId(e.target.value)} style={{ padding: 6, maxWidth: 160 }} title="Artikulli"><option value="">Artikull: të gjithë</option>{products.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select>
+          <select value={warehouse} onChange={e => setWarehouse(e.target.value)} style={{ padding: 6, maxWidth: 150 }} title="Magazina"><option value="">Magazina: të gjitha</option>{warehouses.map(w => <option key={w} value={w}>{w}</option>)}</select>
+          <select value={pay} onChange={e => setPay(e.target.value)} style={{ padding: 6 }} title="Mënyra e pagesës"><option value="">Pagesa: të gjitha</option><option value="Para">Para</option><option value="Credit">Kredi</option></select>
         </div>
         <div className="right"><span className="type-chip">{built.rows.length} rreshta</span></div>
       </div>

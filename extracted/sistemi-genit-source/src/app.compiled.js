@@ -654,6 +654,21 @@ function alphaVatSplit(total, rate) {
   };
 }
 function buildAlphaReport(id, fil, D) {
+  D = Object.assign({}, D);
+  if (fil.supplierId) D.pos = (D.pos || []).filter(x => x.supplierId === fil.supplierId);
+  if (fil.customerId) D.sales = (D.sales || []).filter(x => x.customerId === fil.customerId || (x.customerName || 'Walk-in') === fil.customerId);
+  if (fil.pay) D.sales = (D.sales || []).filter(x => (x.paymentMethod || 'Para') === fil.pay);
+  if (fil.warehouse) D.moves = (D.moves || []).filter(v => (v.warehouse || 'Magazina Kryesore') === fil.warehouse);
+  if (fil.productId) {
+    D.moves = (D.moves || []).filter(v => v.productId === fil.productId);
+    D.products = (D.products || []).filter(pr => pr.id === fil.productId);
+  }
+  if (fil.q) {
+    const q = String(fil.q).toLowerCase();
+    D.pos = (D.pos || []).filter(x => String(x.supplierName || '').toLowerCase().includes(q) || String(x.poNumber || '').toLowerCase().includes(q));
+    D.sales = (D.sales || []).filter(x => String(x.customerName || '').toLowerCase().includes(q) || String(x.invoiceNo || '').toLowerCase().includes(q));
+    D.products = (D.products || []).filter(pr => String(pr.name || '').toLowerCase().includes(q) || String(pr.sku || '').toLowerCase().includes(q));
+  }
   const F = [{
     label: 'Fillimi:',
     value: fil.from
@@ -1043,7 +1058,7 @@ function buildAlphaReport(id, fil, D) {
       totals.vlerab += qty * Number(pr.cost || 0);
       totals.vleras += qty * Number(pr.price || 0);
     });
-  } else {
+  } else if (id === 'Rap_ArkaDitariKlasik') {
     spec = {
       title: 'Ditari Klasik i arkës',
       filters: F,
@@ -18844,6 +18859,11 @@ function AlphaReportsView({
   const [to, setTo] = useState(today);
   const [sel, setSel] = useState('Rap_BlerjeRegjistriPermbledhes');
   const [productId, setProductId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [warehouse, setWarehouse] = useState('');
+  const [pay, setPay] = useState('');
+  const [q, setQ] = useState('');
   const {
     loading,
     data
@@ -18856,11 +18876,22 @@ function AlphaReportsView({
   const receipts = useMemo(() => data && data[5] && data[5].success ? data[5].data : [], [data]);
   const suppliers = useMemo(() => data && data[6] && data[6].success ? data[6].data : [], [data]);
   const customers = useMemo(() => data && data[7] && data[7].success ? data[7].data : [], [data]);
-  const built = useMemo(() => buildAlphaReport(sel, {
+  const warehouses = useMemo(() => {
+    const set = new Set(['Magazina Kryesore']);
+    (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore'));
+    return Array.from(set).sort();
+  }, [moves]);
+  const fil = {
     from,
     to,
-    productId
-  }, {
+    productId,
+    customerId,
+    supplierId,
+    warehouse,
+    pay,
+    q
+  };
+  const built = useMemo(() => buildAlphaReport(sel, fil, {
     pos,
     sales,
     products,
@@ -18869,7 +18900,7 @@ function AlphaReportsView({
     receipts,
     suppliers,
     customers
-  }), [sel, from, to, productId, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
   const MODULES = [{
     label: 'BLERJE',
     items: [['Rap_BlerjeRegjistriPermbledhes', 'Regjistri permbledhes i blerjeve'], ['Rap_BlerjeRegjistriAnalitik', 'Regjistri analitik i blerjeve'], ['Rap_BlerjeRegjistriAnalitikFormat2', 'Regjistri analitik (Format 2)'], ['Rap_BlerjeRegjistriAnalitik_meDetajime', 'Regjistri analitik me detajime'], ['Rap_Blerje_Analitike', 'Blerje Analitike'], ['Rap_LibriBlerjeveSipasMuajve', 'Libri i blerjeve sipas muajve'], ['Rap_ArtikujTeBlere', 'Artikuj te blere'], ['Rap_ArtikujBlereDet', 'Artikuj te blere me detajime'], ['Rap_ListeCmimeshBlerje', 'Liste cmimesh blerje'], ['Rap_EksportFaturaveBlerje', 'Eksportimi i faturave te blerjeve'], ['Rap_SituacionIFurnitoreveLandscape', 'Situacion i furnitorit']]
@@ -18886,7 +18917,6 @@ function AlphaReportsView({
     label: 'FINANCË',
     items: [['Rap_Bilanci', 'Bilanci'], ['Rap_Pasqyra_Konsoliduar_Gjendje_Financiare', 'Pasqyra e konsoliduar'], ['Rap_PASH', 'Të ardhurat e shpenzimet (PASH)'], ['Rap_CashFlow', 'Cash Flow'], ['Rap_PasqyraLevizjesFondeve', 'Lëvizja e fondeve'], ['Rap_GjendjaLlogariveMeLevizje', 'Lëvizja e llogarive D/K'], ['Rap_KontGjendjaLlogariMastro', 'Bilanci vërtetues'], ['Rap_KontLibriiMadh', 'Libri i madh'], ['Rap_kontKartelaLlogarive', 'Kartela e llogarive']]
   }];
-  const kartela = String(sel).indexOf('KartelaArtikulli') >= 0;
   const doPdf = () => saveFaturePdf(built.html, sel + '.pdf');
   const doXlsx = () => {
     const API = window.sistemiGenitAPI;
@@ -18973,23 +19003,80 @@ function AlphaReportsView({
     type: "date",
     value: to,
     onChange: e => setTo(e.target.value)
-  }), kartela && React.createElement(React.Fragment, null, React.createElement("label", {
+  }), React.createElement("input", {
+    placeholder: "K\xEBrkim\u2026",
+    value: q,
+    onChange: e => setQ(e.target.value),
     style: {
-      color: '#808080'
+      padding: 6,
+      width: 120
     }
-  }, "Artikulli"), React.createElement("select", {
+  }), React.createElement("select", {
+    value: supplierId,
+    onChange: e => setSupplierId(e.target.value),
+    style: {
+      padding: 6,
+      maxWidth: 160
+    },
+    title: "Furnitori"
+  }, React.createElement("option", {
+    value: ""
+  }, "Furnitor: t\xEB gjith\xEB"), suppliers.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.name))), React.createElement("select", {
+    value: customerId,
+    onChange: e => setCustomerId(e.target.value),
+    style: {
+      padding: 6,
+      maxWidth: 160
+    },
+    title: "Klienti"
+  }, React.createElement("option", {
+    value: ""
+  }, "Klient: t\xEB gjith\xEB"), customers.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.name
+  }, x.name))), React.createElement("select", {
     value: productId,
     onChange: e => setProductId(e.target.value),
     style: {
       padding: 6,
-      maxWidth: 220
-    }
+      maxWidth: 160
+    },
+    title: "Artikulli"
   }, React.createElement("option", {
     value: ""
-  }, "\u2014 t\xEB gjith\xEB \u2014"), products.map(pr => React.createElement("option", {
+  }, "Artikull: t\xEB gjith\xEB"), products.map(pr => React.createElement("option", {
     key: pr.id,
     value: pr.id
-  }, pr.name))))), React.createElement("div", {
+  }, pr.name))), React.createElement("select", {
+    value: warehouse,
+    onChange: e => setWarehouse(e.target.value),
+    style: {
+      padding: 6,
+      maxWidth: 150
+    },
+    title: "Magazina"
+  }, React.createElement("option", {
+    value: ""
+  }, "Magazina: t\xEB gjitha"), warehouses.map(w => React.createElement("option", {
+    key: w,
+    value: w
+  }, w))), React.createElement("select", {
+    value: pay,
+    onChange: e => setPay(e.target.value),
+    style: {
+      padding: 6
+    },
+    title: "M\xEBnyra e pages\xEBs"
+  }, React.createElement("option", {
+    value: ""
+  }, "Pagesa: t\xEB gjitha"), React.createElement("option", {
+    value: "Para"
+  }, "Para"), React.createElement("option", {
+    value: "Credit"
+  }, "Kredi"))), React.createElement("div", {
     className: "right"
   }, React.createElement("span", {
     className: "type-chip"
