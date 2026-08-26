@@ -1397,6 +1397,13 @@ function fleteXlsMatrix(o) {
     M.push([i + 1, r.name || '', r.unit || '', Number(r.qty) || 0, Number(r.price) || 0, Number(r.value) || 0]);
   });
   for (let i = (o.rows || []).length; i < 21; i++) M.push([i + 1, '', '', '', '', '']);
+  let tq = 0,
+    tv = 0;
+  (o.rows || []).slice(0, 21).forEach(function (r) {
+    tq += Number(r.qty) || 0;
+    tv += Number(r.value) || 0;
+  });
+  M.push(['', 'Totali:', '', Math.round(tq * 100) / 100, '', Math.round(tv * 100) / 100]);
   M.push(['Emri, mbiemri', 'Magazinieri', 'Marrësi në dorëzim', 'Transportuesi', 'Llogaritari', '']);
   M.push(['Nënshkrimi', '', '', '', '', '']);
   return {
@@ -1578,6 +1585,13 @@ function buildWarehouseHtml(sale) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
+  let totQ = 0,
+    totV = 0;
+  rows.slice(0, 21).forEach(function (r) {
+    totQ += Number(r.qty) || 0;
+    totV += Number(r.value) || 0;
+  });
+  body += '<tr><td style="border-top:2px solid #111"></td><td style="text-align:left;border-top:2px solid #111"><b>Totali:</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fQ(totQ) + '</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fL(totV) + '</b></td></tr>';
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline">' + escL(saleBuyerName(sale) || '') + '</div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË DALJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(sale.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa ku shkon malli</b><div class="fd-topline" style="margin-top:8px">' + escL(saleBuyerAddress(sale) || saleBuyerName(sale) || '') + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
 function buildWarehouseInHtml(receipt) {
@@ -1611,6 +1625,13 @@ function buildWarehouseInHtml(receipt) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
+  let totQ = 0,
+    totV = 0;
+  rows.slice(0, 21).forEach(function (r) {
+    totQ += Number(r.qty) || 0;
+    totV += Number(r.value) || 0;
+  });
+  body += '<tr><td style="border-top:2px solid #111"></td><td style="text-align:left;border-top:2px solid #111"><b>Totali:</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fQ(totQ) + '</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fL(totV) + '</b></td></tr>';
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' + '<div class="fd-head">' + '<div><div class="fd-topline">' + escL(receipt.supplierName || '') + '</div><div class="fd-topline"></div></div>' + '<div><div class="fd-title">FLETË - HYRJE</div><div style="display:flex;justify-content:space-around;margin-top:8px"><b>Nr. ' + escL(docNo) + '</b><b>Dt: ' + escL(reportDateOnly(receipt.createdAt || nowIso())) + '</b></div></div>' + '<div><b>Adresa nga vjen malli</b><div class="fd-topline" style="margin-top:8px">' + escL(receipt.sourceAddress || receipt.supplierAddress || (receipt.warehouse ? 'Magazina: ' + receipt.warehouse : '')) + '</div></div>' + '</div>' + '<div class="fd-subhead"><div>Emri, mbiemri pers. Autorizuar</div><div></div><div>Lloji e targa e Mjeti transp.</div><div class="fd-serial">' + escL(serial) + '</div></div>' + '<table class="fd-table"><thead><tr><th>Nr</th><th>Emërtimi i mallit</th><th>Njësia</th><th>Sasia</th><th>Çmimi</th><th>Vlefta</th></tr></thead><tbody>' + body + '</tbody></table>' + '<table class="fd-signs"><tr><td class="a">Emri, mbiemri</td><td>Magazinieri</td><td>Marrësi në dorëzim</td><td>Transportuesi</td><td>Llogaritari</td></tr><tr class="s"><td class="a">Nënshkrimi</td><td></td><td></td><td></td><td></td></tr></table>' + '</div>';
 }
 async function openWarehouseReceiptInDocument(receiptOrId, autoPrint) {
