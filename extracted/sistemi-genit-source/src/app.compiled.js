@@ -635,6 +635,7 @@ function alphaReportHtml(spec, rows, totals) {
   }
   const body = (rows || []).map(r => '<tr>' + lead.map(c => '<td class="l">' + alphaEsc(r[c.key]) + '</td>').join('') + spec.columns.map(c => {
     if (c.link) {
+      if (c.link === 'row' && !r._link) return '<td class="l">' + alphaEsc(r[c.key]) + '</td>';
       const lt = c.link === 'row' ? r._link || '' : c.link;
       const lid = c.link === 'row' ? r._id || '' : r[c.linkId || 'id'] || '';
       return '<td class="l"><button type="button" class="doc-link" data-alink="' + alphaEsc(lt) + '" data-id="' + alphaEsc(lid) + '"><i class="fas fa-arrow-right"></i>' + alphaEsc(r[c.key]) + '</button></td>';
@@ -1092,7 +1093,8 @@ function buildAlphaReport(id, fil, D) {
       }, {
         key: 'pershkrimi',
         label: 'Përshkrimi',
-        align: 'l'
+        align: 'l',
+        link: 'row'
       }, {
         key: 'hyrje',
         label: 'Hyrje',
@@ -1117,7 +1119,9 @@ function buildAlphaReport(id, fil, D) {
       dt: String(x.createdAt || '').slice(0, 10),
       pershkrimi: 'Faturë ' + (x.invoiceNo || '') + ' — ' + (x.customerName || 'Walk-in'),
       hyrje: Number(x.total || 0),
-      dalje: 0
+      dalje: 0,
+      _link: 'sale',
+      _id: x.id
     }));
     (D.expenses || []).filter(e => alphaInPeriod(e.date || e.createdAt, fil)).forEach(e => ev.push({
       dt: String(e.date || e.createdAt || '').slice(0, 10),
@@ -1131,6 +1135,8 @@ function buildAlphaReport(id, fil, D) {
       bal = round2(bal + e.hyrje - e.dalje);
       rows.push({
         rend: rows.length + 1,
+        _link: e._link || '',
+        _id: e._id || '',
         dt: e.dt,
         pershkrimi: e.pershkrimi,
         hyrje: e.hyrje,
@@ -10228,7 +10234,7 @@ function ReportsView({
     loading,
     data,
     err
-  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns()]), []);
+  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn()]), []);
   const sales = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
   const products = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
   const moves = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);
@@ -10237,6 +10243,7 @@ function ReportsView({
   const customers = useMemo(() => data && data[5] && data[5].success ? data[5].data : [], [data]);
   const suppliers = useMemo(() => data && data[6] && data[6].success ? data[6].data : [], [data]);
   const returns = useMemo(() => data && data[7] && data[7].success ? data[7].data : [], [data]);
+  const receipts = useMemo(() => data && data[8] && data[8].success ? data[8].data : [], [data]);
   const productById = useMemo(() => products.reduce((m, p) => (m[p.id] = p, m), {}), [products]);
   const customerById = useMemo(() => customers.reduce((m, c) => (m[c.id] = c, m), {}), [customers]);
   const supplierById = useMemo(() => suppliers.reduce((m, s) => (m[s.id] = s, m), {}), [suppliers]);
@@ -10436,7 +10443,8 @@ function ReportsView({
     tax: Number(l.lineTax || 0),
     total: Number(l.lineTotal || 0),
     payment: l.paymentMethod,
-    warehouse: l.warehouse
+    warehouse: l.warehouse,
+    saleId: l.saleId
   }));
   const dailyRows = reportGroup(filteredSales, s => String(s.createdAt || '').slice(0, 10), s => ({
     date: String(s.createdAt || '').slice(0, 10),
@@ -10524,7 +10532,8 @@ function ReportsView({
     qty: purchaseLines.filter(l => l.poId === p.id).reduce((a, it) => a + Number(it.qty || 0), 0),
     unitSummary: (p.items || []).map(it => (it.enteredQty != null ? it.enteredQty : it.qty) + ' ' + (it.unitName || 'copë')).join(', '),
     total: Number(p.total) || 0,
-    status: p.status || '-'
+    status: p.status || '-',
+    poId: p.id
   }));
   const purchaseTotal = purchaseLines.reduce((a, r) => a + Number(r.lineTotal || 0), 0);
   const purchaseItemRows = reportGroup(purchaseLines, l => (l.productId || l.productName || 'unknown') + '|' + (l.unitKey || 'base'), l => ({
@@ -10601,7 +10610,9 @@ function ReportsView({
       qty2: formatQtyTwoUnits(Number(m.qty) || 0, p, m.unitKey),
       unit: m.unitName || unitBaseName(p),
       reason: m.reason || '-',
-      reference: m.reference || '-'
+      reference: m.reference || '-',
+      reasonRaw: m.reason || '',
+      refRaw: m.reference || ''
     };
   }).filter(r => filterProduct(r.productId) && (!filters.warehouse || r.warehouse === filters.warehouse) && reportMatch(filters.q, r.product, r.sku, r.type, r.reason, r.reference, r.warehouse));
   const warehouseRows = stockRows.sort((a, b) => String(a.warehouse).localeCompare(String(b.warehouse)) || String(a.name).localeCompare(String(b.name)));
@@ -10612,7 +10623,8 @@ function ReportsView({
     net: Number(s.total || 0) - Number(s.tax || 0),
     tax: Number(s.tax || 0),
     total: Number(s.total || 0),
-    rate: (s.items || [])[0]?.taxRate ?? CFG.taxRate ?? 0
+    rate: (s.items || [])[0]?.taxRate ?? CFG.taxRate ?? 0,
+    saleId: s.id
   }));
   const returnRows = filteredReturns.map(r => ({
     date: r.createdAt,
@@ -10760,7 +10772,8 @@ function ReportsView({
           doc: p.poNumber || '-',
           debit: Number(p.total || 0),
           credit: 0,
-          balance: bal
+          balance: bal,
+          poId: p.id
         });
       });
       expenseRows.filter(e => e.vendor === sup.name).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(e => {
@@ -10784,6 +10797,7 @@ function ReportsView({
     kind: 'Klient',
     type: 'Faturim shitje',
     doc: s.invoiceNo || '-',
+    saleId: s.id,
     invoice: Number(s.total || 0),
     payment: s.paymentMethod === 'Credit' ? 0 : Number(s.total || 0),
     balance: s.paymentMethod === 'Credit' ? Number(s.total || 0) : 0
@@ -10793,6 +10807,7 @@ function ReportsView({
     kind: 'Furnitor',
     type: 'Faturim blerje',
     doc: p.poNumber || '-',
+    poId: p.id,
     invoice: Number(p.total || 0),
     payment: 0,
     balance: Number(p.total || 0)
@@ -10985,8 +11000,25 @@ function ReportsView({
     label: 'Kartela',
     icon: 'fa-address-book'
   }];
+  const onDocClick = e => {
+    const b = e.target.closest('[data-doc]');
+    if (!b) return;
+    const t = b.getAttribute('data-doc');
+    const idv = b.getAttribute('data-id');
+    if (t === 'sale') {
+      const x = sales.find(v => v.id === idv);
+      if (x) openSaleDocument(x, 'a4', false);
+    } else if (t === 'po') {
+      const po = purchases.find(v => v.id === idv);
+      if (po) openPurchaseDocument(po, suppliers.find(sp => sp.id === po.supplierId), false);
+    } else if (t === 'receipt') {
+      const r = receipts.find(v => v.id === idv);
+      if (r) openWarehouseReceiptInDocument(r, false);
+    }
+  };
   return React.createElement("div", {
-    className: "data-section reports-page"
+    className: "data-section reports-page",
+    onClick: onDocClick
   }, React.createElement("div", {
     className: "reports-top"
   }, React.createElement("div", null, React.createElement("h2", null, React.createElement("i", {
@@ -11209,7 +11241,14 @@ function ReportsView({
     columns: [{
       key: 'invoice',
       label: 'Fatura',
-      value: r => r.invoiceNo || String(r.id).slice(-6).toUpperCase()
+      value: r => React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.id
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.invoiceNo || String(r.id).slice(-6).toUpperCase())
     }, {
       key: 'date',
       label: 'Data',
@@ -11263,7 +11302,14 @@ function ReportsView({
     columns: [{
       key: 'invoiceNo',
       label: 'Fatura',
-      value: r => r.invoiceNo
+      value: r => r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.invoiceNo) : r.invoiceNo
     }, {
       key: 'date',
       label: 'Data',
@@ -11552,7 +11598,21 @@ function ReportsView({
     }, {
       key: 'doc',
       label: 'Dokumenti',
-      value: r => r.doc
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.doc
     }, {
       key: 'party',
       label: 'Klient/Furnitor',
@@ -11611,7 +11671,21 @@ function ReportsView({
     }, {
       key: 'doc',
       label: 'Dokumenti',
-      value: r => r.doc
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.doc
     }, {
       key: 'debit',
       label: 'Debi/Faturim',
@@ -11654,7 +11728,21 @@ function ReportsView({
     }, {
       key: 'doc',
       label: 'Dokumenti',
-      value: r => r.doc
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.doc
     }, {
       key: 'invoice',
       label: 'Faturim',
@@ -11688,7 +11776,21 @@ function ReportsView({
     }, {
       key: 'doc',
       label: 'Dokumenti',
-      value: r => r.doc
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.doc
     }, {
       key: 'party',
       label: 'Klient/Furnitor',
@@ -11814,7 +11916,21 @@ function ReportsView({
     }, {
       key: 'doc',
       label: 'Dokumenti',
-      value: r => r.doc
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.doc) : r.doc
     }, {
       key: 'debit',
       label: 'Debi',
@@ -11968,7 +12084,14 @@ function ReportsView({
     }, {
       key: 'reference',
       label: 'Referencë',
-      value: r => r.reference
+      value: r => r.refRaw && r.refRaw !== '-' ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": r.reasonRaw === 'Sale' ? 'sale' : 'receipt',
+        "data-id": r.refRaw
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.reference) : r.reference
     }]
   }), tab === 'lowStock' && React.createElement(ReportTable, {
     filters: activeFilters,
@@ -12110,7 +12233,14 @@ function ReportsView({
     columns: [{
       key: 'poNumber',
       label: 'Nr. Porosie',
-      value: r => r.poNumber
+      value: r => r.poId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "po",
+        "data-id": r.poId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.poNumber) : r.poNumber
     }, {
       key: 'date',
       label: 'Data',
@@ -12275,7 +12405,14 @@ function ReportsView({
     columns: [{
       key: 'invoiceNo',
       label: 'Fatura',
-      value: r => r.invoiceNo
+      value: r => r.saleId ? React.createElement("button", {
+        type: "button",
+        className: "doc-link",
+        "data-doc": "sale",
+        "data-id": r.saleId
+      }, React.createElement("i", {
+        className: "fas fa-arrow-right"
+      }), r.invoiceNo) : r.invoiceNo
     }, {
       key: 'date',
       label: 'Data',
@@ -16988,7 +17125,8 @@ function alphaExtraReports(id, fil, D) {
       columns: [{
         key: 'pershkrimi',
         label: 'Përshkrimi',
-        align: 'l'
+        align: 'l',
+        link: 'row'
       }, {
         key: 'hyrje',
         label: 'Hyrje',
@@ -17623,7 +17761,8 @@ function alphaExtraReports(id, fil, D) {
       }, {
         key: 'dok',
         label: 'Dokumenti',
-        align: 'l'
+        align: 'l',
+        link: 'row'
       }].concat(withMag ? [{
         key: 'magazina',
         label: 'Magazina'
@@ -17659,6 +17798,8 @@ function alphaExtraReports(id, fil, D) {
       bal = round2(bal + inn - out);
       rows.push({
         rend: rows.length + 1,
+        _link: v.reason === 'Sale' ? 'sale' : v.reason === 'Purchase' || v.reason === 'Fletë Hyrje' ? 'receipt' : '',
+        _id: v.reference || '',
         dt: String(v.createdAt || '').slice(0, 10),
         dok: (v.reason || '') + (v.reference ? ' ' + v.reference : ''),
         magazina: v.warehouse || 'Magazina Kryesore',
@@ -17965,6 +18106,11 @@ function alphaExtraReports(id, fil, D) {
         key: 'dt',
         label: 'Data'
       }, {
+        key: 'dok',
+        label: 'Dokumenti',
+        align: 'l',
+        link: 'row'
+      }, {
         key: 'magazina',
         label: 'Magazina'
       }, {
@@ -17993,6 +18139,8 @@ function alphaExtraReports(id, fil, D) {
       const val = round2(q * Number(v.unitCost || 0));
       rows.push({
         rend: rows.length + 1,
+        _link: v.reason === 'Sale' ? 'sale' : v.reason === 'Purchase' || v.reason === 'Fletë Hyrje' ? 'receipt' : '',
+        _id: v.reference || '',
         dt: String(v.createdAt || '').slice(0, 10),
         magazina: v.warehouse || 'Magazina Kryesore',
         artikulli: v.productName || v.productId || '',
