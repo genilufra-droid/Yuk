@@ -214,6 +214,29 @@ function registerAtomicHandlers(ipcMain, db, logError) {
         // 5. Audit log.
         db.logActivity('Sale', userName(user), invoiceNo + ' — Total ' + round2(sale.total) + ' (' + items.length + ' items)');
 
+        // 5b. Odoo-style: sale validation automatically produces the Fletë Dalje
+        //     document (relational + kv mirror) so warehouse registers/lists
+        //     show the outgoing document without any extra step.
+        try {
+          const fdId = pushId();
+          db.raw().prepare(
+            'INSERT INTO warehouse_documents (id, doc_no, type, warehouse, counterparty, counterparty_id, reference_doc, reason, total, created_by, created_at) ' +
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+          ).run(fdId, warehouseDocNo, 'out', String(sale.warehouse || 'Magazina Kryesore'),
+            String(sale.customerName || sale.client_name || 'Walk-in'), String(sale.clientId || sale.customerId || ''),
+            saleId, 'Sale', round2(sale.total), userName(user), now);
+          for (const it of insertedItems) {
+            db.raw().prepare(
+              'INSERT INTO warehouse_document_items (document_id, product_id, name, unit_name, qty, price, value) VALUES (?,?,?,?,?,?,?)'
+            ).run(fdId, String(it.productId || ''), String(it.name || ''), String(it.unitName || 'copë'),
+              Number(it.qty || 0), round2(it.unitSalePrice != null ? it.unitSalePrice : (it.price || 0)), round2(it.lineTotal != null ? it.lineTotal : 0));
+          }
+          db.raw().prepare("INSERT OR REPLACE INTO kv_nodes (path, value_json, updated_at) VALUES (?,?,datetime('now'))")
+            .run('warehouse_documents/' + fdId, JSON.stringify({ id: fdId, docNo: warehouseDocNo, type: 'out',
+              warehouse: String(sale.warehouse || 'Magazina Kryesore'), counterparty: String(sale.customerName || sale.client_name || 'Walk-in'),
+              reference: saleId, poNumber: invoiceNo, total: round2(sale.total), createdAt: now }));
+        } catch (e) { /* FD doc is best-effort; stock movements already posted */ }
+
         // 6. Mirror to kv_nodes for renderer compatibility.
         const kvPayload = Object.assign({
           status: 'completed', invoiceNo, warehouseDocNo, cashier: userName(user), createdAt: now

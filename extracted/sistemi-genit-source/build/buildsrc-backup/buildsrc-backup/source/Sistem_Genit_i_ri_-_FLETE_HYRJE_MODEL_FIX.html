@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.2.3'
+      initializedVersion: '1.2.4'
     };
 
     try {
@@ -4941,8 +4941,10 @@ function buildAlphaReport(id, fil, D) {
   if (fil.supplierId) D.pos = (D.pos || []).filter(x => x.supplierId === fil.supplierId);
   if (fil.customerId) D.sales = (D.sales || []).filter(x => x.customerId === fil.customerId || (x.customerName || 'Walk-in') === fil.customerId);
   if (fil.pay) D.sales = (D.sales || []).filter(x => (x.paymentMethod || 'Para') === fil.pay);
+  const origMoves = D.moves || [];
   if (fil.warehouse) D.moves = (D.moves || []).filter(v => (v.warehouse || 'Magazina Kryesore') === fil.warehouse);
   if (fil.productId) { D.moves = (D.moves || []).filter(v => v.productId === fil.productId); D.products = (D.products || []).filter(pr => pr.id === fil.productId); }
+  D.movesAll = origMoves.filter(v => (!fil.warehouse || (v.warehouse || 'Magazina Kryesore') === fil.warehouse) && (!fil.productId || v.productId === fil.productId) && (!fil.to || String(v.createdAt || '').slice(0, 10) <= fil.to));
   if (fil.moveType) D.moves = (D.moves || []).filter(v => v.type === fil.moveType);
   if (fil.expCat) D.expenses = (D.expenses || []).filter(e => (e.category || '') === fil.expCat);
   if (fil.q) {
@@ -12433,9 +12435,9 @@ function SettingsView({ user, role }) {
 // alphaExtraReports — remaining Alpha WEB catalogue (49 reports) on the same
 // engine. Finance reports use a simplified derived chart of accounts.
 // ===========================================================================
-function alphaWhStock(D) {
+function alphaWhStock(D, list) {
   const m = {};
-  (D.moves || []).forEach(v => {
+  (list || D.moves || []).forEach(v => {
     const pid = v.productId || ''; if (!m[pid]) m[pid] = { total: 0, wh: {} };
     const q = Number(v.qty || 0) * (v.type === 'in' ? 1 : -1);
     const w = v.warehouse || 'Magazina Kryesore';
@@ -12444,7 +12446,7 @@ function alphaWhStock(D) {
   return m;
 }
 function alphaStockValue(D) {
-  const ws = alphaWhStock(D); let val = 0;
+  const ws = alphaWhStock(D, D.movesAll); let val = 0;
   (D.products || []).forEach(p => { val += (ws[p.id] ? ws[p.id].total : Number(p.stock || 0)) * Number(p.cost || 0); });
   return round2(val);
 }
@@ -12516,7 +12518,7 @@ function alphaExtraReports(id, fil, D) {
     const m = {};
     (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => (p.items || []).forEach(it => { const k = it.name || ''; m[k] = m[k] || { artikulli: k, sasiaB: 0, vleraB: 0, sasiaS: 0, vleraS: 0, gjendja: 0 }; m[k].sasiaB += Number(it.enteredQty != null ? it.enteredQty : it.qty) || 0; m[k].vleraB += Number(it.lineTotal || 0); }));
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => (x.items || []).forEach(it => { const k = it.name || ''; m[k] = m[k] || { artikulli: k, sasiaB: 0, vleraB: 0, sasiaS: 0, vleraS: 0, gjendja: 0 }; m[k].sasiaS += Number(it.displayQty != null ? it.displayQty : it.qty) || 0; m[k].vleraS += Number(it.lineTotal || 0); }));
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => { if (m[pr.name]) m[pr.name].gjendja = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0); });
     rows = Object.keys(m).sort().map(k => m[k]);
     rows.forEach(r => { totals.sasiaB += r.sasiaB; totals.vleraB += r.vleraB; totals.sasiaS += r.sasiaS; totals.vleraS += r.vleraS; });
@@ -12535,17 +12537,17 @@ function alphaExtraReports(id, fil, D) {
   } else if (id === 'Rap_FleteInventarizimi') {
     spec = { title: 'Fletë inventarizimi', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }], columns: [{ key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'sasia', label: 'Sasia sipas sistemit', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }] };
     totals = { sasia: 0, vlera: 0 };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => { const q = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0); rows.push({ rend: rows.length + 1, kodi: pr.sku || '', artikulli: pr.name || '', njesia: pr.unit || 'copë', sasia: q, vlera: round2(q * Number(pr.cost || 0)) }); totals.sasia += q; totals.vlera += round2(q * Number(pr.cost || 0)); });
   } else if (id === 'Rap_GjendjaArtikujveSipasMagazines' || id === 'Rap_GjendjaMagDet') {
     spec = { title: id === 'Rap_GjendjaMagDet' ? 'Gjendja e magazinës sipas detajimeve të artikujve' : 'Gjendja e artikujve sipas magazinës', filters: F, leadCols: [], columns: [{ key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'magazina', label: 'Magazina' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }] };
     totals = { sasia: 0, vlera: 0 };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => { const w = ws[pr.id] ? ws[pr.id].wh : {}; Object.keys(w).forEach(mg => { rows.push({ kodi: pr.sku || '', artikulli: pr.name || '', magazina: mg, sasia: w[mg], vlera: round2(w[mg] * Number(pr.cost || 0)) }); totals.sasia += w[mg]; totals.vlera += round2(w[mg] * Number(pr.cost || 0)); }); });
   } else if (id === 'Rap_GjendjaPermbledhese_Artikulli') {
     spec = { title: 'Gjendja e përmbledhur e artikujve', filters: F, leadCols: [], columns: [{ key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'magazinat', label: 'Nr. magazinave', num: 1 }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'vlerab', label: 'Vlera blerjes', num: 1 }, { key: 'vleras', label: 'Vlera shitjes', num: 1 }] };
     totals = { sasia: 0, vlerab: 0, vleras: 0 };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => { const w = ws[pr.id] ? ws[pr.id].wh : {}; const q = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0); rows.push({ kodi: pr.sku || '', artikulli: pr.name || '', magazinat: Object.keys(w).length, sasia: q, vlerab: round2(q * Number(pr.cost || 0)), vleras: round2(q * Number(pr.price || 0)) }); totals.sasia += q; totals.vlerab += round2(q * Number(pr.cost || 0)); totals.vleras += round2(q * Number(pr.price || 0)); });
   } else if (id === 'Rap_KartelaArtikulli' || id === 'Rap_KartelaArtikulli_Format2' || id === 'Rap_KartelaArtikulliMagazina' || id === 'Rap_KartelaArtikulliMagazinaDetajime' || id === 'Rap_KartelaArtikulliShitje') {
     const withMag = id === 'Rap_KartelaArtikulliMagazina' || id === 'Rap_KartelaArtikulliMagazinaDetajime';
@@ -12555,7 +12557,7 @@ function alphaExtraReports(id, fil, D) {
     totals = { hyrje: 0, dalje: 0, vlera: 0 };
     const pid = fil.productId || '';
     let bal = 0;
-    (D.moves || []).filter(v => (!pid || v.productId === pid) && (!onlySales || v.reason === 'Sale') && alphaInPeriod(v.createdAt, fil)).forEach(v => {
+    (D.movesAll || []).filter(v => (!pid || v.productId === pid) && (!onlySales || v.reason === 'Sale')).forEach(v => {
       const q = Number(v.qty || 0); const inn = v.type === 'in' ? q : 0; const out = v.type === 'out' ? q : 0;
       bal = round2(bal + inn - out);
       rows.push({ rend: rows.length + 1, dt: String(v.createdAt || '').slice(0, 10), dok: (v.reason || '') + (v.reference ? ' ' + v.reference : ''), magazina: v.warehouse || 'Magazina Kryesore', hyrje: inn, dalje: out, balanca: bal, vlera: round2((inn - out) * Number(v.unitCost || 0)) });
@@ -12569,7 +12571,7 @@ function alphaExtraReports(id, fil, D) {
   } else if (id === 'Rap_MagazinaGjendja' || id === 'Rap_MagazinaGjendjaNeVlefte') {
     spec = { title: id === 'Rap_MagazinaGjendjaNeVlefte' ? 'Gjendja e magazinës në vleftë' : 'Gjendja e magazinës', filters: F, leadCols: [], columns: [{ key: 'magazina', label: 'Magazina', align: 'l' }, { key: 'artikuj', label: 'Nr. artikujve', num: 1 }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'vlerab', label: 'Vlera blerjes', num: 1 }].concat(id === 'Rap_MagazinaGjendjaNeVlefte' ? [{ key: 'vleras', label: 'Vlera shitjes', num: 1 }] : []) };
     totals = { artikuj: 0, sasia: 0, vlerab: 0, vleras: 0 };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     const agg = {};
     (D.products || []).forEach(pr => { const w = ws[pr.id] ? ws[pr.id].wh : {}; Object.keys(w).forEach(mg => { agg[mg] = agg[mg] || { magazina: mg, artikuj: 0, sasia: 0, vlerab: 0, vleras: 0 }; agg[mg].artikuj++; agg[mg].sasia += w[mg]; agg[mg].vlerab += round2(w[mg] * Number(pr.cost || 0)); agg[mg].vleras += round2(w[mg] * Number(pr.price || 0)); }); });
     rows = Object.keys(agg).sort().map(k => agg[k]);
@@ -12583,8 +12585,8 @@ function alphaExtraReports(id, fil, D) {
     totals = { b0_30: 0, b31_60: 0, b61_90: 0, b90: 0, totali: 0 };
     const now = new Date();
     (D.products || []).forEach(pr => {
-      const ins = (D.moves || []).filter(v => v.productId === pr.id && v.type === 'in').sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
-      const outs = (D.moves || []).filter(v => v.productId === pr.id && v.type === 'out').reduce((a, v) => a + Number(v.qty || 0), 0);
+      const ins = (D.movesAll || []).filter(v => v.productId === pr.id && v.type === 'in').sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+      const outs = (D.movesAll || []).filter(v => v.productId === pr.id && v.type === 'out').reduce((a, v) => a + Number(v.qty || 0), 0);
       let remainOut = outs; const buckets = { b0_30: 0, b31_60: 0, b61_90: 0, b90: 0 };
       ins.forEach(v => { let q = Number(v.qty || 0); if (remainOut > 0) { const used = Math.min(q, remainOut); q -= used; remainOut -= used; } if (q <= 0) return; const days = Math.floor((now - new Date(v.createdAt || now)) / 86400000); const b = days <= 30 ? 'b0_30' : days <= 60 ? 'b31_60' : days <= 90 ? 'b61_90' : 'b90'; buckets[b] += q; });
       const tot = round2(buckets.b0_30 + buckets.b31_60 + buckets.b61_90 + buckets.b90);
@@ -12729,7 +12731,7 @@ function alphaExtraReports(id, fil, D) {
 function AlphaReportsView({ user, role }) {
   const today = new Date().toISOString().slice(0, 10);
   const first = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(first);
+  const [from, setFrom] = useState('');
   const [to, setTo] = useState(today);
   const [sel, setSel] = useState('Rap_BlerjeRegjistriPermbledhes');
   const [productId, setProductId] = useState('');

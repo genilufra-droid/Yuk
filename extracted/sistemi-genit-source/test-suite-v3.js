@@ -312,7 +312,8 @@ async function main() {
     assert(r && r.success === true, 'warehouseDoc:save (Fletë Dalje) returns success');
     assert(r && r.docNo && r.docNo.startsWith('FD-'), 'FD doc number generated');
     assertClose(getStock('p5'), stockBefore - 5, 0.001, 'stock OUT: 35 -> 30');
-    assertEq(countRows('warehouse_documents', "type='out'"), 1, 'one Fletë Dalje document');
+    assert(countRows('warehouse_documents', "type='out'") >= 1, 'Fletë Dalje docs exist (auto nga shitjet + manual)');
+    assertEq(countRows('warehouse_documents', "doc_no='" + r.docNo + "'"), 1, 'manual FD doc present');
   }
 
   // =========================================================================

@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-25T14:07:12.860Z",
-  "passed": 98,
+  "timestamp": "2026-08-26T17:35:49.564Z",
+  "passed": 99,
   "failed": 0,
-  "total": 98,
+  "total": 99,
   "passRate": "100.0%",
   "results": [
     {
@@ -302,7 +302,11 @@
     },
     {
       "status": "PASS",
-      "test": "one Fletë Dalje document",
+      "test": "Fletë Dalje docs exist (auto nga shitjet + manual)"
+    },
+    {
+      "status": "PASS",
+      "test": "manual FD doc present",
       "value": 1
     },
     {
@@ -395,8 +399,8 @@
         "purchases": 1,
         "purchase_items": 1,
         "purchase_orders": 1,
-        "warehouse_documents": 3,
-        "warehouse_document_items": 2,
+        "warehouse_documents": 8,
+        "warehouse_document_items": 7,
         "stock_movements": 17,
         "warehouse_stock": 11,
         "payments": 5,

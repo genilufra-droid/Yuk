@@ -617,6 +617,73 @@ function buildFatureHtml(d) {
   }).join('');
   return FATURE_A4_CSS + '<div class="sheet doc-a4">' + '<h1>FATURË</h1>' + '<div class="box">' + '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.seller.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit :</b></div><div>' + escL(d.seller.nipt || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div>Data dhe ora e lëshimit të faturës:</div><div>' + escL(fatureDateFmt(d.issueIso)) + '</div></div>' + '<div class="r"><div>Numri i Faturës:</div><div>' + escL(d.invoiceNo || '') + '</div></div>' + '<div class="r"><div>Operatori:</div><div>' + escL(d.operator || '') + '</div></div>' + '<div class="r"><div>Kodin e vendit të ushtrimit të veprimtarisë:</div><div>' + escL(d.unitCode || '') + '</div></div>' + '<div class="r"><div>Lloji i Faturës:</div><div>' + escL(d.typeLabel || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div><b>Blerësi:</b></div><div>' + escL(d.buyer.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.buyer.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit:</b></div><div>' + escL(d.buyer.nipt || '') + '</div></div></div>' + '<table><thead><tr><th>Përshkrimi i Mallit ose Shërbimit</th><th>Njësia e Matjes</th><th>Sasia</th><th>Cmimi për njësi pa tvsh</th><th>Zbritje %</th><th>Norma e TVSH</th><th>Vlera pa TVSH (sasi x çmimi)</th><th>TVSH (Vlera)</th><th>Vlera Totale</th></tr></thead><tbody>' + rows + totRow('Vlera pa TVSH', d.subtotal, false) + totRow('Vlera totale e TVSH-së', d.vatTotal, false) + totRow('Totali per tu paguar (LEK)', d.grandTotal, true) + '</tbody></table>' + '<p class="vathead">Shpërndarja e TVSH-së</p>' + '<table class="vat"><thead><tr><th>Norma e TVSH-se</th><th>Baza e tatueshme (LEK)</th><th>Vlera e TVSH-se(LEK)</th></tr></thead><tbody>' + vat + '</tbody></table>' + '<p class="fl">Data dhe ora e kryerjes së pagesës:<span>' + escL(payDateFmt(d.payIso)) + '</span></p>' + '<p class="fl">Numri i sigurisë së lëshuesit të faturës (NSLF):<span>' + escL(d.nslf || '') + '</span></p>' + '<p class="fl">Numri identifikues të veçantë të faturës (NIVF):<span>' + escL(d.nivf || '') + '</span></p>' + '</div>';
 }
+async function autoReceivePo(po, warehouse, user, fhNo) {
+  try {
+    const autoNo = fhNo || 'FH-' + String(po.poNumber || Date.now()).replace(/[^0-9A-Z]/gi, '').slice(-6);
+    const receipt = {
+      docNo: autoNo,
+      poId: po.id,
+      poNumber: po.poNumber,
+      supplierId: po.supplierId,
+      supplierName: po.supplierName,
+      warehouse: warehouse,
+      items: (po.items || []).map(function (it) {
+        return {
+          productId: it.productId,
+          name: it.name,
+          sku: it.sku,
+          qty: Number(it.qty) || 0,
+          enteredQty: Number(it.enteredQty != null ? it.enteredQty : it.qty) || 0,
+          unitKey: it.unitKey || 'base',
+          unitName: it.unitName || 'copë',
+          unitMultiplier: Number(it.unitMultiplier) || 1,
+          unitCost: Number(it.unitCost) || 0,
+          enteredUnitCost: Number(it.enteredUnitCost || it.lineUnitCost || it.unitCost) || 0,
+          lineTotal: Number(it.lineTotal) || 0,
+          warehouse: warehouse
+        };
+      }),
+      total: po.total || 0,
+      notes: po.notes || '',
+      createdAt: new Date().toISOString()
+    };
+    const rr = await fbCreateWarehouseReceiptIn(receipt, user);
+    if (!rr.success) return rr;
+    return await fbReceivePurchaseOrder(po, user, false, warehouse, {
+      id: rr.id,
+      docNo: autoNo
+    });
+  } catch (e) {
+    return {
+      success: false,
+      message: e.message
+    };
+  }
+}
+async function fbGetWarehouseDocs() {
+  try {
+    const snap = await db.ref('warehouse_documents').once('value');
+    const val = snap.val() || {};
+    const arr = Object.entries(val).map(function (e) {
+      return Object.assign({
+        id: e[0]
+      }, e[1]);
+    });
+    arr.sort(function (a, b) {
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+    return {
+      success: true,
+      data: arr
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: e.message,
+      data: []
+    };
+  }
+}
 async function fbGetSupplierPayments() {
   try {
     const snap = await db.ref('supplier_payments').once('value');
@@ -8249,6 +8316,7 @@ function ThermalReceiptOverlay({
 }) {
   const [docMode, setDocMode] = useState('thermal');
   const [trace, setTrace] = useState(false);
+  const [wh, setWh] = useState(sale && sale.warehouse || 'Magazina Kryesore');
   useEffect(() => {
     setLastDocSale(sale);
   }, [sale]);
@@ -8279,7 +8347,26 @@ function ThermalReceiptOverlay({
       width: '100%',
       marginBottom: 10
     }
-  }, React.createElement("button", {
+  }, React.createElement("select", {
+    value: wh,
+    onChange: async e => {
+      setWh(e.target.value);
+      if (sale && sale.id) {
+        try {
+          await fbUpdateSale(sale.id, {
+            warehouse: e.target.value
+          }, null);
+        } catch (err) {}
+      }
+    },
+    style: {
+      padding: 6
+    },
+    title: "Magazina e daljes"
+  }, (CFG.warehouses && CFG.warehouses.length ? CFG.warehouses : ['Magazina Kryesore', 'Depo 2']).map(w => React.createElement("option", {
+    key: w,
+    value: w
+  }, w))), React.createElement("button", {
     type: "button",
     className: "btn btn-preview",
     onClick: () => setTrace(true)
@@ -8786,7 +8873,8 @@ function POSView({
       changeDue: round2(changeDue),
       customerId: customerId || '',
       customerName: cust ? cust.name : 'Walk-in',
-      status: paymentMethod === 'Credit' ? 'credit' : 'completed'
+      status: paymentMethod === 'Credit' ? 'credit' : 'completed',
+      warehouse: selectedWarehouse || 'Magazina Kryesore'
     };
     const res = await fbCreateSale(sale, user);
     setLoad('');
@@ -13656,6 +13744,8 @@ function PurchaseOrderModal({
   const [unitKey, setUnitKey] = useState('base');
   const [unitCost, setUnitCost] = useState('');
   const [saving, setSaving] = useState(false);
+  const [warehouse, setWarehouse] = useState('Magazina Kryesore');
+  const [autoReceive, setAutoReceive] = useState(true);
   const supplierOpts = useMemo(() => (suppliers || []).map(s => ({
     value: s.id,
     label: s.name
@@ -13750,7 +13840,9 @@ function PurchaseOrderModal({
       total: round2(total),
       notes: notes.trim() || null,
       expectedDate: expectedDate || null,
-      status
+      status,
+      warehouse: warehouse,
+      autoReceive: autoReceive
     });
     setSaving(false);
   };
@@ -13871,7 +13963,34 @@ function PurchaseOrderModal({
     onClick: () => removeLine(l.key)
   }, React.createElement("i", {
     className: "fas fa-times"
-  })))))))), React.createElement("p", {
+  })))))))), React.createElement("div", {
+    className: "form-group",
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("label", null, "Magazina (pranimi i stokut)"), React.createElement("select", {
+    value: warehouse,
+    onChange: e => setWarehouse(e.target.value),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  }, (CFG.warehouses && CFG.warehouses.length ? CFG.warehouses : ['Magazina Kryesore', 'Depo 2']).map(w => React.createElement("option", {
+    key: w,
+    value: w
+  }, w)))), React.createElement("label", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      alignItems: 'center',
+      marginTop: 8,
+      color: '#555'
+    }
+  }, React.createElement("input", {
+    type: "checkbox",
+    checked: autoReceive,
+    onChange: e => setAutoReceive(e.target.checked)
+  }), "Kalo n\xEB stok automatikisht (krijon Flet\xEB Hyrje si n\xEB Odoo)"), React.createElement("p", {
     className: "stock-onhand-hint",
     style: {
       marginTop: 12
@@ -14195,6 +14314,17 @@ function PurchaseOrdersView({
     const r = await fbCreatePurchaseOrder(fd, user);
     setLoad('');
     if (r.success) {
+      if (fd.autoReceive && fd.warehouse) {
+        const po = r.data || Object.assign({
+          id: r.id
+        }, fd);
+        const ar = await autoReceivePo(po, fd.warehouse, user);
+        if (ar && !ar.success) Swal.fire({
+          icon: 'warning',
+          title: 'PO u ruajt, por pranimi i stokut dështoi',
+          text: ar.message
+        });
+      }
       setShowModal(false);
       Swal.fire({
         icon: 'success',
@@ -14540,6 +14670,8 @@ function WarehouseReceiptsInView({
   const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [fdDocs, setFdDocs] = useState([]);
+  const [fdTraceDoc, setFdTraceDoc] = useState(null);
   useEffect(() => {
     const fn = () => setReloadKey(k => k + 1);
     window.addEventListener('erp-data-changed', fn);
@@ -14550,6 +14682,11 @@ function WarehouseReceiptsInView({
     data,
     err
   } = useFetch(() => fbGetWarehouseReceiptsIn(), [reloadKey]);
+  useFetch(async () => {
+    const r = await fbGetWarehouseDocs();
+    setFdDocs(r.success ? r.data.filter(x => x.type === 'out') : []);
+    return r;
+  }, [reloadKey]);
   const receipts = useMemo(() => data && data.success ? data.data : [], [data]);
   const filtered = useMemo(() => {
     const q = String(query || '').trim().toLowerCase();
@@ -14596,7 +14733,17 @@ function WarehouseReceiptsInView({
     className: "right"
   }, React.createElement("span", {
     className: "type-chip"
-  }, filtered.length, " dokumente"))), loading ? React.createElement(TableSkeleton, {
+  }, filtered.length, " dokumente"))), React.createElement("div", {
+    style: {
+      margin: '14px 0 6px',
+      fontWeight: 700,
+      color: '#5c6bc0'
+    }
+  }, React.createElement("i", {
+    className: "fas fa-arrow-down"
+  }), " Flet\xEB Hyrje (nga blerjet) \xB7 ", React.createElement("i", {
+    className: "fas fa-arrow-up"
+  }), " Flet\xEB Dalje (nga shitjet, automatike)"), loading ? React.createElement(TableSkeleton, {
     rows: 8,
     columns: 8
   }) : React.createElement("div", {
@@ -14658,6 +14805,30 @@ function WarehouseReceiptsInView({
       label: 'Vlera totale',
       value: money(filtered.reduce((s, r) => s + Number(r.total || 0), 0))
     }]
+  }), fdDocs.length > 0 && React.createElement("div", {
+    className: "about-table-wrapper",
+    style: {
+      marginTop: 12
+    }
+  }, React.createElement("table", {
+    className: "about-roles-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Nr. Flet\xEB Dalje"), React.createElement("th", null, "Data"), React.createElement("th", null, "Klienti"), React.createElement("th", null, "Magazina"), React.createElement("th", null, "Totali"), React.createElement("th", null, "Veprime"))), React.createElement("tbody", null, fdDocs.map(d => React.createElement("tr", {
+    key: d.id
+  }, React.createElement("td", null, React.createElement("b", null, d.docNo)), React.createElement("td", null, formatDateForDisplay(d.createdAt)), React.createElement("td", null, d.counterparty || '-'), React.createElement("td", null, d.warehouse || 'Magazina Kryesore'), React.createElement("td", null, money(d.total || 0)), React.createElement("td", {
+    style: {
+      whiteSpace: 'nowrap'
+    }
+  }, React.createElement("button", {
+    type: "button",
+    className: "action-icon qr-icon",
+    title: "Gjurmueshm\xEBria",
+    onClick: () => setFdTraceDoc(d)
+  }, React.createElement("i", {
+    className: "fas fa-diagram-project"
+  })))))))), fdTraceDoc && React.createElement(TraceModal, {
+    kind: "sale",
+    id: fdTraceDoc.reference,
+    onClose: () => setFdTraceDoc(null)
   }), selectedReceipt && React.createElement(WarehouseReceiptInOverlay, {
     receipt: selectedReceipt,
     onClose: () => setSelectedReceipt(null)
