@@ -798,7 +798,8 @@ function saveFatureXlsx(d, defaultName) {
       options: {
         sheetName: 'Faturë',
         headerRowIndex: built.headerIdx,
-        totalsRowIndex: built.totalsIdx
+        totalsRowIndex: built.totalsIdx,
+        borderAll: true
       },
       defaultName: defaultName
     }).then(function (res) {
@@ -841,6 +842,104 @@ function saveFatureXlsx(d, defaultName) {
       'NIVF': d.nivf
     });
   }
+}
+function fleteXlsMatrix(o) {
+  const M = [];
+  M.push([o.leftLine || '', '', o.kind === 'HYRJE' ? 'FLETË - HYRJE' : 'FLETË DALJE', '', o.rightLabel || '', o.rightLine || '']);
+  M.push(['', '', 'Nr: ' + (o.docNo || '') + '   Dt: ' + (o.dateStr || ''), '', '', '']);
+  M.push(['Emri, mbiemri pers. Autorizuar', '', '', 'Lloji e targa e Mjeti transp.', '', o.serial || '']);
+  const headerIdx = M.length;
+  M.push(['Nr', 'Emërtimi i mallit', 'Njësia', 'Sasia', 'Çmimi', 'Vlefta']);
+  (o.rows || []).slice(0, 21).forEach(function (r, i) {
+    M.push([i + 1, r.name || '', r.unit || '', Number(r.qty) || 0, Number(r.price) || 0, Number(r.value) || 0]);
+  });
+  for (let i = (o.rows || []).length; i < 21; i++) M.push([i + 1, '', '', '', '', '']);
+  M.push(['Emri, mbiemri', 'Magazinieri', 'Marrësi në dorëzim', 'Transportuesi', 'Llogaritari', '']);
+  M.push(['Nënshkrimi', '', '', '', '', '']);
+  return {
+    matrix: M,
+    headerIdx: headerIdx,
+    totalsIdx: null
+  };
+}
+function saveFleteXlsx(o, defaultName) {
+  const built = fleteXlsMatrix(o);
+  const API = window.sistemiGenitAPI;
+  if (API && API.exportXlsx) {
+    return API.exportXlsx({
+      matrix: built.matrix,
+      options: {
+        sheetName: 'Fletë',
+        headerRowIndex: built.headerIdx,
+        borderAll: true
+      },
+      defaultName: defaultName
+    }).then(function (res) {
+      if (res && res.success) {
+        if (window.Swal) Swal.fire({
+          icon: 'success',
+          title: 'Excel u ruajt',
+          text: res.path,
+          timer: 2500
+        });
+      } else if (res && !/Anuluar/.test(res.message || '')) {
+        if (window.Swal) Swal.fire({
+          icon: 'error',
+          title: 'Excel nuk u ruajt',
+          text: res.message || ''
+        });
+      }
+    });
+  }
+}
+function fleteSerial(docNo) {
+  return (String(docNo || '').replace(/[^0-9]/g, '') || '0').padStart(7, '0').slice(-7);
+}
+function fleteDataFromReceipt(r) {
+  const docNo = typeof warehouseDocNoFromReceipt === 'function' ? warehouseDocNoFromReceipt(r) : 'FH-' + String(r.id || '').slice(-6).toUpperCase();
+  return {
+    kind: 'HYRJE',
+    docNo: docNo,
+    dateStr: reportDateOnly(r.createdAt || nowIso()),
+    leftLine: r.supplierName || '',
+    rightLabel: 'Adresa nga vjen malli',
+    rightLine: r.sourceAddress || r.supplierAddress || (r.warehouse ? 'Magazina: ' + r.warehouse : ''),
+    serial: fleteSerial(docNo),
+    rows: typeof warehouseRowsFromPO === 'function' ? warehouseRowsFromPO(r) : r.items || []
+  };
+}
+function fleteDataFromMovement(m, p) {
+  const pr = p || {};
+  const isIn = String(m.type || '').toLowerCase() === 'in';
+  const docNo = (isIn ? 'FH-' : 'FD-') + String(m.id || '').slice(-6).toUpperCase();
+  const qty = m.enteredQty != null ? m.enteredQty : m.qty;
+  const cost = Number(m.unitCost || pr.cost || 0);
+  return {
+    kind: isIn ? 'HYRJE' : 'DALJE',
+    docNo: docNo,
+    dateStr: reportDateOnly(m.createdAt || nowIso()),
+    leftLine: isIn ? m.supplierName || m.note || '' : '',
+    rightLabel: isIn ? 'Adresa nga vjen malli' : 'Adresa ku shkon malli',
+    rightLine: m.reference || m.note || '',
+    serial: fleteSerial(docNo),
+    rows: [{
+      name: pr.name || m.productName || m.productId || '-',
+      unit: m.unitName || pr.unit || 'copë',
+      qty: qty,
+      price: cost,
+      value: qty * cost
+    }]
+  };
+}
+function exportMovementPdf(movement, product) {
+  if (!movement) return;
+  const isIn = String(movement.type || '').toLowerCase() === 'in';
+  return saveFaturePdf(buildMovementWarehouseHtml(movement, product), (isIn ? 'Flete_Hyrje_' : 'Flete_Dalje_') + String(movement.id || '').slice(-6).toUpperCase() + '.pdf');
+}
+function exportMovementXlsx(movement, product) {
+  if (!movement) return;
+  const isIn = String(movement.type || '').toLowerCase() === 'in';
+  return saveFleteXlsx(fleteDataFromMovement(movement, product), (isIn ? 'Flete_Hyrje_' : 'Flete_Dalje_') + String(movement.id || '').slice(-6).toUpperCase() + '.xlsx');
 }
 function saveFaturePdf(html, defaultName) {
   const API = window.sistemiGenitAPI;
@@ -1310,58 +1409,10 @@ function exportWarehouseXlsx(sale) {
   });
 }
 function exportWarehouseInPdf(receipt) {
-  const cols = [{
-    key: 'nr',
-    label: 'Nr'
-  }, {
-    key: 'name',
-    label: 'Emërtimi i mallit'
-  }, {
-    key: 'unit',
-    label: 'Njësia'
-  }, {
-    key: 'qty',
-    label: 'Sasia'
-  }, {
-    key: 'price',
-    label: 'Çmimi'
-  }, {
-    key: 'value',
-    label: 'Vlefta'
-  }, {
-    key: 'warehouse',
-    label: 'Magazina'
-  }];
-  exportTablePdf('Fletë Hyrje', `Nr: ${warehouseDocNoFromReceipt(receipt)} | Data: ${formatDateForDisplay(receipt.createdAt || nowIso())} | Furnitor: ${receipt.supplierName}`, cols, warehouseRowsFromPO(receipt), {
-    value: money(receipt.total || 0)
-  });
+  return saveFaturePdf(buildWarehouseInHtml(receipt), 'Flete_Hyrje_' + String(warehouseDocNoFromReceipt(receipt)).replace(/[^\w\-]+/g, '_') + '.pdf');
 }
 function exportWarehouseInXlsx(receipt) {
-  const cols = [{
-    key: 'nr',
-    label: 'Nr'
-  }, {
-    key: 'name',
-    label: 'Emërtimi i mallit'
-  }, {
-    key: 'unit',
-    label: 'Njësia'
-  }, {
-    key: 'qty',
-    label: 'Sasia'
-  }, {
-    key: 'price',
-    label: 'Çmimi'
-  }, {
-    key: 'value',
-    label: 'Vlefta'
-  }, {
-    key: 'warehouse',
-    label: 'Magazina'
-  }];
-  exportTableXlsx(`Flete_Hyrje_${warehouseDocNoFromReceipt(receipt)}.xlsx`, 'Flete Hyrje', 'Fletë Hyrje', `Nr: ${warehouseDocNoFromReceipt(receipt)} | Data: ${formatDateForDisplay(receipt.createdAt || nowIso())}`, cols, warehouseRowsFromPO(receipt), {
-    value: money(receipt.total || 0)
-  });
+  return saveFleteXlsx(fleteDataFromReceipt(receipt), 'Flete_Hyrje_' + String(warehouseDocNoFromReceipt(receipt)).replace(/[^\w\-]+/g, '_') + '.xlsx');
 }
 function getWarehousesForProduct(product, products) {
   const set = new Set(['Magazina Kryesore', 'Furgon']);
@@ -6888,10 +6939,71 @@ function StockView({
     movements: movements,
     onClose: () => setShowAdjust(false),
     onSave: handleSave
-  }), printMove && React.createElement(FleteDaljePrint, {
+  }), printMove && React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => setPrintMove(null)
+  }, React.createElement("div", {
+    className: "modal thermal-slip-modal",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '980px'
+    }
+  }, React.createElement("div", {
+    className: "modal-body thermal-slip-modal-body"
+  }, React.createElement("div", {
+    className: "erp-export-bar",
+    style: {
+      width: '100%',
+      marginBottom: 10
+    }
+  }, React.createElement("button", {
+    type: "button",
+    className: "btn btn-preview",
+    onClick: () => openMovementDocument(printMove, productMap[printMove.productId], false)
+  }, React.createElement("i", {
+    className: "fas fa-eye"
+  }), " Preview"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: () => openMovementDocument(printMove, productMap[printMove.productId], true)
+  }, React.createElement("i", {
+    className: "fas fa-print"
+  }), " Printo"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-pdf",
+    onClick: () => exportMovementPdf(printMove, productMap[printMove.productId])
+  }, React.createElement("i", {
+    className: "fas fa-file-pdf"
+  }), " PDF"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-excel",
+    onClick: () => exportMovementXlsx(printMove, productMap[printMove.productId])
+  }, React.createElement("i", {
+    className: "fas fa-file-excel"
+  }), " Excel"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: () => setPrintMove(null)
+  }, React.createElement("i", {
+    className: "fas fa-times"
+  }), " Mbyll")), React.createElement("div", {
+    style: {
+      background: '#f5f5f5',
+      padding: 12,
+      borderRadius: 6,
+      overflow: 'auto',
+      maxHeight: '65vh'
+    }
+  }, React.createElement("div", {
+    style: {
+      background: '#fff',
+      margin: '0 auto',
+      width: 'fit-content'
+    }
+  }, React.createElement(FleteDaljePrint, {
     movement: printMove,
     product: productMap[printMove.productId]
-  }));
+  })))))));
 }
 function Cart({
   items,

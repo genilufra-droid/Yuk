@@ -173,6 +173,17 @@ async function matrixToXlsxBuffer(matrix, options) {
     }
   }
 
+  // optional: thin border around the whole used range (document-style exports)
+  if (options.borderAll) {
+    const lastRow = startRow + matrix.length - 1;
+    const thin = { style: 'thin' };
+    for (let r = startRow; r <= lastRow; r++) {
+      for (let c = 1; c <= maxCols; c++) {
+        ws.getRow(r).getCell(c).border = { top: thin, left: thin, bottom: thin, right: thin };
+      }
+    }
+  }
+
   // column widths
   if (options.columnWidths && options.columnWidths.length) {
     for (let i = 0; i < options.columnWidths.length; i++) {
