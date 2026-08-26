@@ -3644,7 +3644,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.3.2'
+      initializedVersion: '1.4.0'
     };
 
     try {
@@ -3678,7 +3678,7 @@ async function fbLogin(email, password) {
   } catch (e) { return { success: false, message: 'Connection error: ' + e.message }; }
 }
 
-async function fbGetRecords() {
+async function __orig_GetRecords() {
   try {
     const snap = await db.ref('records').once('value');
     const val = snap.val() || {};
@@ -3691,7 +3691,7 @@ async function fbLogActivity(action, user, detail) {
 }
 
 // business settings - single object at /settings
-async function fbGetSettings() {
+async function __orig_GetSettings() {
   try { const snap = await db.ref('settings').once('value'); return { success: true, data: snap.val() || {} }; }
   catch (e) { return { success: false, message: e.message, data: {} }; }
 }
@@ -3701,7 +3701,7 @@ async function fbSaveSettings(data, user) {
 }
 
 // categories - data-driven now (was a hardcoded enum)
-async function fbGetCategories() {
+async function __orig_GetCategories() {
   try { const snap = await db.ref('categories').once('value'); const val = snap.val() || {}; return { success: true, data: Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }) }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -3745,7 +3745,7 @@ async function fbDeleteRecord(id, name, user) {
     return { success: true, message: 'Customer deleted' };
   } catch (e) { return { success: false, message: e.message }; }
 }
-const fbGetCustomers = fbGetRecords;
+const fbGetCustomers = function () { return cachedFetch("fbGetCustomers", __orig_GetRecords); };
 
 function toggleActive(id, val) {
   db.ref('records/' + id).update({ active: !!val }).then(function() {
@@ -3754,7 +3754,7 @@ function toggleActive(id, val) {
 }
 window.toggleActive = toggleActive;
 
-async function fbGetLogs() {
+async function __orig_GetLogs() {
   try {
     const snap = await db.ref('activity_logs').limitToLast(20).once('value');
     const val = snap.val() || {};
@@ -3783,7 +3783,7 @@ async function fbGenerateInvoiceNo() {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetProducts() {
+async function __orig_GetProducts() {
   try {
     const snap = await db.ref('products').once('value');
     const val = snap.val() || {};
@@ -3823,7 +3823,7 @@ async function fbDeleteProduct(id, name, user) {
 }
 
 // stock ledger - qty on hand always derived live from this list, never stored
-async function fbGetStockMovements() {
+async function __orig_GetStockMovements() {
   try {
     const snap = await db.ref('stock_movements').once('value');
     const val = snap.val() || {};
@@ -3888,7 +3888,7 @@ async function fbCreateSale(sale, user) {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetSales() {
+async function __orig_GetSales() {
   try {
     const snap = await db.ref('sales').once('value');
     const val = snap.val() || {};
@@ -3909,7 +3909,7 @@ async function fbUpdateSale(id, data, user) {
 }
 
 
-async function fbGetReturns() {
+async function __orig_GetReturns() {
   try {
     const snap = await db.ref('returns').once('value');
     const val = snap.val() || {};
@@ -3958,7 +3958,7 @@ async function fbBulkStockIn(lines, user) {
 }
 
 // suppliers - vendor directory + payables opening balance
-async function fbGetSuppliers() {
+async function __orig_GetSuppliers() {
   try { const snap = await db.ref('suppliers').once('value'); const val = snap.val() || {}; return { success: true, data: Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }) }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -3979,7 +3979,7 @@ async function fbDeleteSupplier(id, name, user) {
 }
 
 // expenses - operating costs feeding the P&L
-async function fbGetExpenses() {
+async function __orig_GetExpenses() {
   try { const snap = await db.ref('expenses').once('value'); const val = snap.val() || {}; const arr = Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }); arr.sort(function(a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); }); return { success: true, data: arr }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -4007,7 +4007,7 @@ async function fbGeneratePoNumber() {
     return { success: true, data: 'PO-' + String(res.snapshot.val()).padStart(5, '0') };
   } catch (e) { return { success: false, message: e.message }; }
 }
-async function fbGetPurchaseOrders() {
+async function __orig_GetPurchaseOrders() {
   try { const snap = await db.ref('purchase_orders').once('value'); const val = snap.val() || {}; const arr = Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }); arr.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }); return { success: true, data: arr }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -4039,7 +4039,7 @@ async function fbCreateWarehouseReceiptIn(receipt, user) {
   }
 }
 
-async function fbGetWarehouseReceiptsIn() {
+async function __orig_GetWarehouseReceiptsIn() {
   try {
     const snap = await db.ref('warehouse_receipts_in').once('value');
     const data = snap.val() || {};
@@ -4093,7 +4093,7 @@ async function fbDeletePurchaseOrder(id, poNumber, user) {
   catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetUsers() {
+async function __orig_GetUsers() {
   try {
     const snap = await db.ref('users').once('value');
     const val = snap.val() || {};

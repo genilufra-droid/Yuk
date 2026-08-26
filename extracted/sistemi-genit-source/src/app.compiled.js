@@ -660,7 +660,7 @@ async function autoReceivePo(po, warehouse, user, fhNo) {
     };
   }
 }
-async function fbGetWarehouseDocs() {
+async function __orig_GetWarehouseDocs() {
   try {
     const snap = await db.ref('warehouse_documents').once('value');
     const val = snap.val() || {};
@@ -684,7 +684,7 @@ async function fbGetWarehouseDocs() {
     };
   }
 }
-async function fbGetSupplierPayments() {
+async function __orig_GetSupplierPayments() {
   try {
     const snap = await db.ref('supplier_payments').once('value');
     const val = snap.val() || {};
@@ -3478,6 +3478,67 @@ function buildCodeIndex(products) {
     });
   });
   return m;
+}
+window.fbGetSales = function () {
+  return cachedFetch('fbGetSales', __orig_GetSales);
+};
+window.fbGetProducts = function () {
+  return cachedFetch('fbGetProducts', __orig_GetProducts);
+};
+window.fbGetStockMovements = function () {
+  return cachedFetch('fbGetStockMovements', __orig_GetStockMovements);
+};
+window.fbGetPurchaseOrders = function () {
+  return cachedFetch('fbGetPurchaseOrders', __orig_GetPurchaseOrders);
+};
+window.fbGetRecords = function () {
+  return cachedFetch('fbGetRecords', __orig_GetRecords);
+};
+window.fbGetSuppliers = function () {
+  return cachedFetch('fbGetSuppliers', __orig_GetSuppliers);
+};
+window.fbGetExpenses = function () {
+  return cachedFetch('fbGetExpenses', __orig_GetExpenses);
+};
+window.fbGetReturns = function () {
+  return cachedFetch('fbGetReturns', __orig_GetReturns);
+};
+window.fbGetWarehouseReceiptsIn = function () {
+  return cachedFetch('fbGetWarehouseReceiptsIn', __orig_GetWarehouseReceiptsIn);
+};
+window.fbGetSupplierPayments = function () {
+  return cachedFetch('fbGetSupplierPayments', __orig_GetSupplierPayments);
+};
+window.fbGetWarehouseDocs = function () {
+  return cachedFetch('fbGetWarehouseDocs', __orig_GetWarehouseDocs);
+};
+window.fbGetCategories = function () {
+  return cachedFetch('fbGetCategories', __orig_GetCategories);
+};
+window.fbGetUsers = function () {
+  return cachedFetch('fbGetUsers', __orig_GetUsers);
+};
+window.fbGetLogs = function () {
+  return cachedFetch('fbGetLogs', __orig_GetLogs);
+};
+window.fbGetSettings = function () {
+  return cachedFetch('fbGetSettings', __orig_GetSettings);
+};
+const __sgCache = {};
+let __sgCacheV = 0;
+window.addEventListener('erp-data-changed', () => {
+  __sgCacheV++;
+});
+async function cachedFetch(key, fn) {
+  const e = __sgCache[key];
+  if (e && e.v === __sgCacheV && Date.now() - e.t < 15000) return e.r;
+  const r = await fn();
+  __sgCache[key] = {
+    v: __sgCacheV,
+    t: Date.now(),
+    r: r
+  };
+  return r;
 }
 function useFetch(fn, deps = []) {
   const [s, setS] = useState({
@@ -10418,11 +10479,17 @@ function ReportsView({
   };
   const [tab, setTab] = useState('sales');
   const [filters, setFilters] = useState(emptyFilters);
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    const fn = () => setReloadKey(k => k + 1);
+    window.addEventListener('erp-data-changed', fn);
+    return () => window.removeEventListener('erp-data-changed', fn);
+  }, []);
   const {
     loading,
     data,
     err
-  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), []);
+  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), [reloadKey]);
   const sales = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
   const products = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
   const moves = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);

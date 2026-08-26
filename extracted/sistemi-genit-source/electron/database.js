@@ -74,6 +74,12 @@ class SistemiGenitDatabase {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+    // v1.4.0 performance: safe-with-WAL tuning for a desktop single-writer app
+    this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('cache_size = -65536');           // ~64 MB page cache
+    this.db.pragma('mmap_size = 268435456');         // 256 MB mmap
+    this.db.pragma('temp_store = MEMORY');
+    this.db.pragma('journal_size_limit = 67108864');
     this._applySchema();
     this._runMigrations();
     this._transactionDepth = 0;

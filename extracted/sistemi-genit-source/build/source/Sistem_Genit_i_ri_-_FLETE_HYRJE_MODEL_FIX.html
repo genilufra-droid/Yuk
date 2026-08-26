@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.3.2'
+      initializedVersion: '1.4.0'
     };
 
     try {
@@ -3687,7 +3687,7 @@ async function fbLogin(email, password) {
   } catch (e) { return { success: false, message: 'Connection error: ' + e.message }; }
 }
 
-async function fbGetRecords() {
+async function __orig_GetRecords() {
   try {
     const snap = await db.ref('records').once('value');
     const val = snap.val() || {};
@@ -3700,7 +3700,7 @@ async function fbLogActivity(action, user, detail) {
 }
 
 // business settings - single object at /settings
-async function fbGetSettings() {
+async function __orig_GetSettings() {
   try { const snap = await db.ref('settings').once('value'); return { success: true, data: snap.val() || {} }; }
   catch (e) { return { success: false, message: e.message, data: {} }; }
 }
@@ -3710,7 +3710,7 @@ async function fbSaveSettings(data, user) {
 }
 
 // categories - data-driven now (was a hardcoded enum)
-async function fbGetCategories() {
+async function __orig_GetCategories() {
   try { const snap = await db.ref('categories').once('value'); const val = snap.val() || {}; return { success: true, data: Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }) }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -3754,7 +3754,7 @@ async function fbDeleteRecord(id, name, user) {
     return { success: true, message: 'Customer deleted' };
   } catch (e) { return { success: false, message: e.message }; }
 }
-const fbGetCustomers = fbGetRecords;
+const fbGetCustomers = function () { return cachedFetch("fbGetCustomers", __orig_GetRecords); };
 
 function toggleActive(id, val) {
   db.ref('records/' + id).update({ active: !!val }).then(function() {
@@ -3763,7 +3763,7 @@ function toggleActive(id, val) {
 }
 window.toggleActive = toggleActive;
 
-async function fbGetLogs() {
+async function __orig_GetLogs() {
   try {
     const snap = await db.ref('activity_logs').limitToLast(20).once('value');
     const val = snap.val() || {};
@@ -3792,7 +3792,7 @@ async function fbGenerateInvoiceNo() {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetProducts() {
+async function __orig_GetProducts() {
   try {
     const snap = await db.ref('products').once('value');
     const val = snap.val() || {};
@@ -3832,7 +3832,7 @@ async function fbDeleteProduct(id, name, user) {
 }
 
 // stock ledger - qty on hand always derived live from this list, never stored
-async function fbGetStockMovements() {
+async function __orig_GetStockMovements() {
   try {
     const snap = await db.ref('stock_movements').once('value');
     const val = snap.val() || {};
@@ -3897,7 +3897,7 @@ async function fbCreateSale(sale, user) {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetSales() {
+async function __orig_GetSales() {
   try {
     const snap = await db.ref('sales').once('value');
     const val = snap.val() || {};
@@ -3918,7 +3918,7 @@ async function fbUpdateSale(id, data, user) {
 }
 
 
-async function fbGetReturns() {
+async function __orig_GetReturns() {
   try {
     const snap = await db.ref('returns').once('value');
     const val = snap.val() || {};
@@ -3967,7 +3967,7 @@ async function fbBulkStockIn(lines, user) {
 }
 
 // suppliers - vendor directory + payables opening balance
-async function fbGetSuppliers() {
+async function __orig_GetSuppliers() {
   try { const snap = await db.ref('suppliers').once('value'); const val = snap.val() || {}; return { success: true, data: Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }) }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -3988,7 +3988,7 @@ async function fbDeleteSupplier(id, name, user) {
 }
 
 // expenses - operating costs feeding the P&L
-async function fbGetExpenses() {
+async function __orig_GetExpenses() {
   try { const snap = await db.ref('expenses').once('value'); const val = snap.val() || {}; const arr = Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }); arr.sort(function(a, b) { return new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt); }); return { success: true, data: arr }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -4016,7 +4016,7 @@ async function fbGeneratePoNumber() {
     return { success: true, data: 'PO-' + String(res.snapshot.val()).padStart(5, '0') };
   } catch (e) { return { success: false, message: e.message }; }
 }
-async function fbGetPurchaseOrders() {
+async function __orig_GetPurchaseOrders() {
   try { const snap = await db.ref('purchase_orders').once('value'); const val = snap.val() || {}; const arr = Object.entries(val).map(function(e) { return Object.assign({ id: e[0] }, e[1]); }); arr.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }); return { success: true, data: arr }; }
   catch (e) { return { success: false, message: e.message, data: [] }; }
 }
@@ -4048,7 +4048,7 @@ async function fbCreateWarehouseReceiptIn(receipt, user) {
   }
 }
 
-async function fbGetWarehouseReceiptsIn() {
+async function __orig_GetWarehouseReceiptsIn() {
   try {
     const snap = await db.ref('warehouse_receipts_in').once('value');
     const data = snap.val() || {};
@@ -4102,7 +4102,7 @@ async function fbDeletePurchaseOrder(id, poNumber, user) {
   catch (e) { return { success: false, message: e.message }; }
 }
 
-async function fbGetUsers() {
+async function __orig_GetUsers() {
   try {
     const snap = await db.ref('users').once('value');
     const val = snap.val() || {};
@@ -4897,7 +4897,7 @@ async function autoReceivePo(po, warehouse, user, fhNo) {
     return await fbReceivePurchaseOrder(po, user, false, warehouse, { id: rr.id, docNo: autoNo });
   } catch (e) { return { success: false, message: e.message }; }
 }
-async function fbGetWarehouseDocs() {
+async function __orig_GetWarehouseDocs() {
   try {
     const snap = await db.ref('warehouse_documents').once('value');
     const val = snap.val() || {};
@@ -4912,7 +4912,7 @@ async function fbGetWarehouseDocs() {
 // number (Mandat Pagese), linked to the purchase invoice; reflected in
 // reports, arka and traceability chain.
 // ===========================================================================
-async function fbGetSupplierPayments() {
+async function __orig_GetSupplierPayments() {
   try {
     const snap = await db.ref('supplier_payments').once('value');
     const val = snap.val() || {};
@@ -6731,6 +6731,34 @@ function buildCodeIndex(products) {
 
 
 // race-safe data loading - token guard drops stale + post-unmount results
+window.fbGetSales = function () { return cachedFetch('fbGetSales', __orig_GetSales); };
+window.fbGetProducts = function () { return cachedFetch('fbGetProducts', __orig_GetProducts); };
+window.fbGetStockMovements = function () { return cachedFetch('fbGetStockMovements', __orig_GetStockMovements); };
+window.fbGetPurchaseOrders = function () { return cachedFetch('fbGetPurchaseOrders', __orig_GetPurchaseOrders); };
+window.fbGetRecords = function () { return cachedFetch('fbGetRecords', __orig_GetRecords); };
+window.fbGetSuppliers = function () { return cachedFetch('fbGetSuppliers', __orig_GetSuppliers); };
+window.fbGetExpenses = function () { return cachedFetch('fbGetExpenses', __orig_GetExpenses); };
+window.fbGetReturns = function () { return cachedFetch('fbGetReturns', __orig_GetReturns); };
+window.fbGetWarehouseReceiptsIn = function () { return cachedFetch('fbGetWarehouseReceiptsIn', __orig_GetWarehouseReceiptsIn); };
+window.fbGetSupplierPayments = function () { return cachedFetch('fbGetSupplierPayments', __orig_GetSupplierPayments); };
+window.fbGetWarehouseDocs = function () { return cachedFetch('fbGetWarehouseDocs', __orig_GetWarehouseDocs); };
+window.fbGetCategories = function () { return cachedFetch('fbGetCategories', __orig_GetCategories); };
+window.fbGetUsers = function () { return cachedFetch('fbGetUsers', __orig_GetUsers); };
+window.fbGetLogs = function () { return cachedFetch('fbGetLogs', __orig_GetLogs); };
+window.fbGetSettings = function () { return cachedFetch('fbGetSettings', __orig_GetSettings); };
+
+// v1.4.0 performance: short-lived cache for heavy kv getters so multiple
+// views/tabs don't re-assemble the same kv trees within seconds.
+const __sgCache = {};
+let __sgCacheV = 0;
+window.addEventListener('erp-data-changed', () => { __sgCacheV++; });
+async function cachedFetch(key, fn) {
+  const e = __sgCache[key];
+  if (e && e.v === __sgCacheV && Date.now() - e.t < 15000) return e.r;
+  const r = await fn();
+  __sgCache[key] = { v: __sgCacheV, t: Date.now(), r: r };
+  return r;
+}
 function useFetch(fn, deps = []) {
   const [s, setS] = useState({ loading: true, data: null, err: null });
   const tok = useRef(0);
@@ -9915,7 +9943,9 @@ function ReportsView({ user, role, setActiveMenu }) {
   const emptyFilters = { from: firstDay, to: today, q: '', productId: '', customerId: '', supplierId: '', unitKey: '', price: '', warehouse: '' };
   const [tab, setTab] = useState('sales');
   const [filters, setFilters] = useState(emptyFilters);
-  const { loading, data, err } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), []);
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => { const fn = () => setReloadKey(k => k + 1); window.addEventListener('erp-data-changed', fn); return () => window.removeEventListener('erp-data-changed', fn); }, []);
+  const { loading, data, err } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), [reloadKey]);
 
   const sales = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
   const products = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
