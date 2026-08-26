@@ -249,15 +249,19 @@ async function alphaXlsxBuffer(spec, rows, totals) {
   ws.getCell(1, 1).alignment = { horizontal: 'center' };
   ws.mergeCells(1, 1, 1, nCols);
 
+  ws.getRow(1).height = 30;
   let r = 2;
   (spec.filters || []).forEach(f => {
+    ws.mergeCells(r, 1, r, nCols); // guide: keep filter merges like the source XLSX
     ws.getCell(r, 1).value = f.label + ' ' + (f.value == null ? '' : String(f.value));
     ws.getCell(r, 1).font = { name: 'Times New Roman', size: 9, color: { argb: GREY } };
+    ws.getRow(r).height = 14;
     r++;
   });
 
   const hasGroups = !!(spec.groups && spec.groups.length);
   const h1 = r, h2 = hasGroups ? r + 1 : r;
+  ws.getRow(h1).height = 16; if (hasGroups) ws.getRow(h2).height = 16;
   const headFont = { bold: true, size: 9, color: { argb: GREEN } };
   if (hasGroups) {
     let c = 1;
@@ -272,6 +276,7 @@ async function alphaXlsxBuffer(spec, rows, totals) {
 
   let dr = h2 + 1;
   (rows || []).forEach(row => {
+    ws.getRow(dr).height = 15;
     let c = 1;
     lead.forEach(l => { const cell = ws.getRow(dr).getCell(c); cell.value = row[l.key] == null ? '' : String(row[l.key]); cell.border = border; cell.font = { size: 9, color: { argb: GREEN } }; c++; });
     spec.columns.forEach(col => {
