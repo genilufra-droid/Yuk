@@ -339,6 +339,18 @@ ipcMain.handle('printer:preview', async (event, payload) => {
 // ===========================================================================
 
 // payload: { matrix, options, defaultName }
+ipcMain.handle('export:alphaXlsx', async (event, payload) => {
+  try {
+    const { spec, rows, totals, defaultName } = payload || {};
+    if (!spec) return { success: false, message: 'Spec mungon' };
+    const buf = await exporters.alphaXlsxBuffer(spec, rows || [], totals || null);
+    return await exporters.saveXlsxDialog(mainWindow, defaultName || 'Raport.xlsx', buf);
+  } catch (err) {
+    logError('export:alphaXlsx', err);
+    return { success: false, message: 'Excel nuk u ruajt: ' + err.message };
+  }
+});
+
 ipcMain.handle('export:xlsx', async (event, payload) => {
   try {
     const { matrix, options, defaultName } = payload || {};

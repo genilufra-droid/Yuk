@@ -105,6 +105,7 @@ const appBridge = {
 
   // excel
   exportXlsx: (payload) => ipcRenderer.invoke('export:xlsx', payload),
+  exportAlphaXlsx: (payload) => ipcRenderer.invoke('export:alphaXlsx', payload),
 
   // dialogs
   saveDialog: (payload) => ipcRenderer.invoke('dialog:save', payload),

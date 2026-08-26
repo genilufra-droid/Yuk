@@ -345,6 +345,7 @@ const RIGHT_LABELS = {
   stock: 'Inventari',
   'sales-history': 'Porositë',
   reports: 'Raportet',
+  'alpha-reports': 'Raporte Alpha',
   records: 'Klientët',
   suppliers: 'Furnitorët',
   'purchase-orders': 'Porosi blerje',
@@ -612,6 +613,507 @@ function buildFatureHtml(d) {
     return '<tr><td class="rate">' + escL(f2(r.rate)) + '</td><td>' + escL(f2(r.base)) + '</td><td>' + escL(f2(r.vat)) + '</td></tr>';
   }).join('');
   return FATURE_A4_CSS + '<div class="sheet doc-a4">' + '<h1>FATURË</h1>' + '<div class="box">' + '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.seller.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit :</b></div><div>' + escL(d.seller.nipt || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div>Data dhe ora e lëshimit të faturës:</div><div>' + escL(fatureDateFmt(d.issueIso)) + '</div></div>' + '<div class="r"><div>Numri i Faturës:</div><div>' + escL(d.invoiceNo || '') + '</div></div>' + '<div class="r"><div>Operatori:</div><div>' + escL(d.operator || '') + '</div></div>' + '<div class="r"><div>Kodin e vendit të ushtrimit të veprimtarisë:</div><div>' + escL(d.unitCode || '') + '</div></div>' + '<div class="r"><div>Lloji i Faturës:</div><div>' + escL(d.typeLabel || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div><b>Blerësi:</b></div><div>' + escL(d.buyer.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.buyer.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit:</b></div><div>' + escL(d.buyer.nipt || '') + '</div></div></div>' + '<table><thead><tr><th>Përshkrimi i Mallit ose Shërbimit</th><th>Njësia e Matjes</th><th>Sasia</th><th>Cmimi për njësi pa tvsh</th><th>Zbritje %</th><th>Norma e TVSH</th><th>Vlera pa TVSH (sasi x çmimi)</th><th>TVSH (Vlera)</th><th>Vlera Totale</th></tr></thead><tbody>' + rows + totRow('Vlera pa TVSH', d.subtotal, false) + totRow('Vlera totale e TVSH-së', d.vatTotal, false) + totRow('Totali per tu paguar (LEK)', d.grandTotal, true) + '</tbody></table>' + '<p class="vathead">Shpërndarja e TVSH-së</p>' + '<table class="vat"><thead><tr><th>Norma e TVSH-se</th><th>Baza e tatueshme (LEK)</th><th>Vlera e TVSH-se(LEK)</th></tr></thead><tbody>' + vat + '</tbody></table>' + '<p class="fl">Data dhe ora e kryerjes së pagesës:<span>' + escL(payDateFmt(d.payIso)) + '</span></p>' + '<p class="fl">Numri i sigurisë së lëshuesit të faturës (NSLF):<span>' + escL(d.nslf || '') + '</span></p>' + '<p class="fl">Numri identifikues të veçantë të faturës (NIVF):<span>' + escL(d.nivf || '') + '</span></p>' + '</div>';
+}
+function alphaCss() {
+  return '<style>' + '.alpha-wrap{background:#fff;padding:18px 22px;font-family:Calibri,Arial,sans-serif;color:#008000;max-width:1160px;margin:0 auto}' + '.alpha-title{font-weight:700;color:#008000;font-size:26px;text-align:center;margin:6px 0 14px}' + '.alpha-filters{font-family:"Times New Roman",serif;color:#808080;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 28px;margin:0 0 10px}' + '.alpha-table{border-collapse:collapse;width:100%}' + '.alpha-table th,.alpha-table td{border:1px solid #808080;color:#008000;font-size:10.5px;padding:3px 6px;text-align:center}' + '.alpha-table th{background:#F0FFF0;font-weight:700}' + '.alpha-table td.l,.alpha-table th.l{text-align:left}' + '.alpha-table td.r{text-align:right}' + '.alpha-total td{border-top:2px solid #000;font-weight:700}' + '.alpha-foot{display:flex;justify-content:space-between;margin-top:26px;font-size:10px}' + '.alpha-foot .fl{font-style:italic;color:#008000}.alpha-foot .pg{color:#008000}' + '</style>';
+}
+function alphaF2(n) {
+  return Number(n || 0).toFixed(2);
+}
+function alphaEsc(x) {
+  return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function alphaReportHtml(spec, rows, totals) {
+  const lead = spec.leadCols || [];
+  let head1 = '',
+    head2 = '';
+  if (spec.groups && spec.groups.length) {
+    head1 = '<tr>' + lead.map(c => '<th rowspan="2" class="l">' + alphaEsc(c.label) + '</th>').join('') + spec.groups.map(g => '<th colspan="' + g.span + '">' + alphaEsc(g.label) + '</th>').join('') + '</tr>';
+    head2 = '<tr>' + spec.columns.map(c => '<th class="' + (c.num ? 'r' : c.align || '') + '">' + alphaEsc(c.label) + '</th>').join('') + '</tr>';
+  } else {
+    head2 = '<tr>' + lead.map(c => '<th class="l">' + alphaEsc(c.label) + '</th>').join('') + spec.columns.map(c => '<th class="' + (c.num ? 'r' : c.align || '') + '">' + alphaEsc(c.label) + '</th>').join('') + '</tr>';
+  }
+  const body = (rows || []).map(r => '<tr>' + lead.map(c => '<td class="l">' + alphaEsc(r[c.key]) + '</td>').join('') + spec.columns.map(c => '<td class="' + (c.num ? 'r' : c.align || '') + '">' + (c.num ? alphaF2(r[c.key]) : alphaEsc(r[c.key])) + '</td>').join('') + '</tr>').join('');
+  let totRow = '';
+  if (totals) {
+    totRow = '<tr class="alpha-total"><td class="l" colspan="' + (lead.length + 1) + '">Total:</td>' + spec.columns.map(c => '<td class="r">' + (totals[c.key] != null ? alphaF2(totals[c.key]) : '') + '</td>').join('') + '</tr>';
+  }
+  const filters = (spec.filters || []).map(f => '<span><b>' + alphaEsc(f.label) + '</b> ' + alphaEsc(f.value) + '</span>').join('');
+  return alphaCss() + '<div class="alpha-wrap sheet">' + '<div class="alpha-title">' + alphaEsc(spec.title) + '</div>' + '<div class="alpha-filters">' + filters + '</div>' + '<table class="alpha-table"><thead>' + head1 + head2 + '</thead><tbody>' + body + totRow + '</tbody></table>' + '<div class="alpha-foot"><div class="fl">Copyright © 2026<br>Dokument i mbikëqyrur në bazë të dhënave të sistemit<br>Sistemi Genit</div><div class="pg">1/1</div></div>' + '</div>';
+}
+function alphaInPeriod(diso, fil) {
+  const d = String(diso || '').slice(0, 10);
+  return (!fil.from || d >= fil.from) && (!fil.to || d <= fil.to);
+}
+function alphaVatSplit(total, rate) {
+  rate = rate || 20;
+  const tvsh = round2(Number(total || 0) * rate / (100 + rate));
+  return {
+    tvsh: tvsh,
+    net: round2(Number(total || 0) - tvsh)
+  };
+}
+function buildAlphaReport(id, fil, D) {
+  const F = [{
+    label: 'Fillimi:',
+    value: fil.from
+  }, {
+    label: 'Përfundimi:',
+    value: fil.to
+  }, {
+    label: 'Monedha:',
+    value: 'LEK'
+  }, {
+    label: 'Kursi:',
+    value: '1'
+  }];
+  let spec = null,
+    rows = [],
+    totals = null;
+  if (id === 'Rap_BlerjeRegjistriPermbledhes') {
+    spec = {
+      title: 'Regjistri Përmbledhës i blerjeve',
+      filters: F,
+      leadCols: [{
+        key: 'rend',
+        label: 'Nr. Rend'
+      }],
+      groups: [{
+        label: 'Dokumenti',
+        span: 7
+      }, {
+        label: 'Monedha Fature',
+        span: 4
+      }, {
+        label: 'Monedha Baze',
+        span: 2
+      }],
+      columns: [{
+        key: 'lloji',
+        label: 'Lloji'
+      }, {
+        key: 'nr',
+        label: 'Nr.'
+      }, {
+        key: 'dt',
+        label: 'Dt. Dok'
+      }, {
+        key: 'mon',
+        label: 'Monedha'
+      }, {
+        key: 'kursi',
+        label: 'Kursi',
+        num: 1
+      }, {
+        key: 'kodi',
+        label: 'Kodi'
+      }, {
+        key: 'emertimi',
+        label: 'Emertimi',
+        align: 'l'
+      }, {
+        key: 'nentotal',
+        label: 'Nentotal',
+        num: 1
+      }, {
+        key: 'zbritje',
+        label: 'Zbritje',
+        num: 1
+      }, {
+        key: 'tvsh',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totali',
+        label: 'Totali',
+        num: 1
+      }, {
+        key: 'tvshb',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totalib',
+        label: 'Totali',
+        num: 1
+      }]
+    };
+    totals = {
+      nentotal: 0,
+      zbritje: 0,
+      tvsh: 0,
+      totali: 0,
+      tvshb: 0,
+      totalib: 0
+    };
+    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => {
+      const v = alphaVatSplit(p.total);
+      rows.push({
+        rend: rows.length + 1,
+        lloji: 'FB',
+        nr: p.poNumber || '',
+        dt: String(p.createdAt || '').slice(0, 10),
+        mon: 'LEK',
+        kursi: 1,
+        kodi: p.supplierId || '',
+        emertimi: p.supplierName || '',
+        nentotal: v.net,
+        zbritje: 0,
+        tvsh: v.tvsh,
+        totali: Number(p.total || 0),
+        tvshb: v.tvsh,
+        totalib: Number(p.total || 0)
+      });
+      totals.nentotal += v.net;
+      totals.tvsh += v.tvsh;
+      totals.totali += Number(p.total || 0);
+      totals.tvshb += v.tvsh;
+      totals.totalib += Number(p.total || 0);
+    });
+  } else if (id === 'Rap_BlerjeRegjistriAnalitik') {
+    spec = {
+      title: 'Regjistri Analitik i blerjeve',
+      filters: F,
+      leadCols: [{
+        key: 'rend',
+        label: 'Nr. Rend'
+      }],
+      columns: [{
+        key: 'nr',
+        label: 'Nr. Dok'
+      }, {
+        key: 'dt',
+        label: 'Dt. Dok'
+      }, {
+        key: 'emertimi',
+        label: 'Furnitori',
+        align: 'l'
+      }, {
+        key: 'artikulli',
+        label: 'Artikulli',
+        align: 'l'
+      }, {
+        key: 'njesia',
+        label: 'Njësia'
+      }, {
+        key: 'sasia',
+        label: 'Sasia',
+        num: 1
+      }, {
+        key: 'cmimi',
+        label: 'Çmimi',
+        num: 1
+      }, {
+        key: 'vlera',
+        label: 'Vlera',
+        num: 1
+      }, {
+        key: 'tvsh',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totali',
+        label: 'Totali',
+        num: 1
+      }]
+    };
+    totals = {
+      sasia: 0,
+      vlera: 0,
+      tvsh: 0,
+      totali: 0
+    };
+    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => {
+      (p.items || []).forEach(it => {
+        const qty = Number(it.enteredQty != null ? it.enteredQty : it.qty) || 0;
+        const cost = Number(it.enteredUnitCost || it.unitCost) || 0;
+        const line = Number(it.lineTotal != null ? it.lineTotal : qty * cost) || 0;
+        const v = alphaVatSplit(line);
+        rows.push({
+          rend: rows.length + 1,
+          nr: p.poNumber || '',
+          dt: String(p.createdAt || '').slice(0, 10),
+          emertimi: p.supplierName || '',
+          artikulli: it.name || '',
+          njesia: it.unitName || 'copë',
+          sasia: qty,
+          cmimi: cost,
+          vlera: v.net,
+          tvsh: v.tvsh,
+          totali: line
+        });
+        totals.sasia += qty;
+        totals.vlera += v.net;
+        totals.tvsh += v.tvsh;
+        totals.totali += line;
+      });
+    });
+  } else if (id === 'Rap_LibriShitjes') {
+    spec = {
+      title: 'Libri i Shitjeve',
+      filters: F,
+      leadCols: [{
+        key: 'rend',
+        label: 'Nr. Rend'
+      }],
+      groups: [{
+        label: 'Dokumenti',
+        span: 5
+      }, {
+        label: 'Monedha Fature',
+        span: 3
+      }, {
+        label: 'Monedha Baze',
+        span: 2
+      }],
+      columns: [{
+        key: 'lloji',
+        label: 'Lloji'
+      }, {
+        key: 'nr',
+        label: 'Nr.'
+      }, {
+        key: 'dt',
+        label: 'Dt. Dok'
+      }, {
+        key: 'klienti',
+        label: 'Klienti',
+        align: 'l'
+      }, {
+        key: 'mon',
+        label: 'Monedha'
+      }, {
+        key: 'nentotal',
+        label: 'Nentotal',
+        num: 1
+      }, {
+        key: 'tvsh',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totali',
+        label: 'Totali',
+        num: 1
+      }, {
+        key: 'tvshb',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totalib',
+        label: 'Totali',
+        num: 1
+      }]
+    };
+    totals = {
+      nentotal: 0,
+      tvsh: 0,
+      totali: 0,
+      tvshb: 0,
+      totalib: 0
+    };
+    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
+      rows.push({
+        rend: rows.length + 1,
+        lloji: 'FAT',
+        nr: x.invoiceNo || '',
+        dt: String(x.createdAt || '').slice(0, 10),
+        klienti: x.customerName || 'Walk-in',
+        mon: 'LEK',
+        nentotal: Number(x.subtotal || 0),
+        tvsh: Number(x.tax || 0),
+        totali: Number(x.total || 0),
+        tvshb: Number(x.tax || 0),
+        totalib: Number(x.total || 0)
+      });
+      totals.nentotal += Number(x.subtotal || 0);
+      totals.tvsh += Number(x.tax || 0);
+      totals.totali += Number(x.total || 0);
+      totals.tvshb += Number(x.tax || 0);
+      totals.totalib += Number(x.total || 0);
+    });
+  } else if (id === 'Rap_ArtikujTeShitur') {
+    spec = {
+      title: 'Artikuj të shitur',
+      filters: F,
+      leadCols: [],
+      columns: [{
+        key: 'kodi',
+        label: 'Kodi'
+      }, {
+        key: 'artikulli',
+        label: 'Artikulli',
+        align: 'l'
+      }, {
+        key: 'njesia',
+        label: 'Njësia'
+      }, {
+        key: 'sasia',
+        label: 'Sasia',
+        num: 1
+      }, {
+        key: 'vlerant',
+        label: 'Vlera pa TVSH',
+        num: 1
+      }, {
+        key: 'tvsh',
+        label: 'TVSH',
+        num: 1
+      }, {
+        key: 'totali',
+        label: 'Totali',
+        num: 1
+      }]
+    };
+    totals = {
+      sasia: 0,
+      vlerant: 0,
+      tvsh: 0,
+      totali: 0
+    };
+    const map = {};
+    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
+      (x.items || []).forEach(it => {
+        const k = it.productId || it.name;
+        if (!map[k]) map[k] = {
+          kodi: it.sku || it.productId || '',
+          artikulli: it.name || '',
+          njesia: it.unitName || 'copë',
+          sasia: 0,
+          vlerant: 0,
+          tvsh: 0,
+          totali: 0
+        };
+        map[k].sasia += Number(it.displayQty != null ? it.displayQty : it.qty) || 0;
+        map[k].vlerant += Number(it.lineNet || 0);
+        map[k].tvsh += Number(it.lineTax || 0);
+        map[k].totali += Number(it.lineTotal != null ? it.lineTotal : 0);
+      });
+    });
+    rows = Object.keys(map).sort((a, b) => map[a].artikulli.localeCompare(map[b].artikulli)).map(k => map[k]);
+    rows.forEach(r => {
+      totals.sasia += r.sasia;
+      totals.vlerant += r.vlerant;
+      totals.tvsh += r.tvsh;
+      totals.totali += r.totali;
+    });
+  } else if (id === 'Rap_GjendjaArtikujveSasiVlere') {
+    spec = {
+      title: 'Gjendja e artikujve në sasi dhe vlerë',
+      filters: F,
+      leadCols: [],
+      columns: [{
+        key: 'kodi',
+        label: 'Kodi'
+      }, {
+        key: 'artikulli',
+        label: 'Artikulli',
+        align: 'l'
+      }, {
+        key: 'njesia',
+        label: 'Njësia'
+      }, {
+        key: 'sasia',
+        label: 'Sasia',
+        num: 1
+      }, {
+        key: 'vlerab',
+        label: 'Vlera e blerjes',
+        num: 1
+      }, {
+        key: 'vleras',
+        label: 'Vlera e shitjes',
+        num: 1
+      }]
+    };
+    totals = {
+      sasia: 0,
+      vlerab: 0,
+      vleras: 0
+    };
+    (D.products || []).forEach(pr => {
+      const qty = Number(pr.stock || 0);
+      rows.push({
+        kodi: pr.sku || pr.barcode || '',
+        artikulli: pr.name || '',
+        njesia: pr.unit || 'copë',
+        sasia: qty,
+        vlerab: qty * Number(pr.cost || 0),
+        vleras: qty * Number(pr.price || 0)
+      });
+      totals.sasia += qty;
+      totals.vlerab += qty * Number(pr.cost || 0);
+      totals.vleras += qty * Number(pr.price || 0);
+    });
+  } else {
+    spec = {
+      title: 'Ditari Klasik i arkës',
+      filters: F,
+      leadCols: [{
+        key: 'rend',
+        label: 'Nr.'
+      }],
+      columns: [{
+        key: 'dt',
+        label: 'Data'
+      }, {
+        key: 'pershkrimi',
+        label: 'Përshkrimi',
+        align: 'l'
+      }, {
+        key: 'hyrje',
+        label: 'Hyrje',
+        num: 1
+      }, {
+        key: 'dalje',
+        label: 'Dalje',
+        num: 1
+      }, {
+        key: 'balanca',
+        label: 'Balanca',
+        num: 1
+      }]
+    };
+    totals = {
+      hyrje: 0,
+      dalje: 0,
+      balanca: 0
+    };
+    const ev = [];
+    (D.sales || []).filter(x => x.status !== 'cancelled' && x.paymentMethod !== 'Credit' && alphaInPeriod(x.createdAt, fil)).forEach(x => ev.push({
+      dt: String(x.createdAt || '').slice(0, 10),
+      pershkrimi: 'Faturë ' + (x.invoiceNo || '') + ' — ' + (x.customerName || 'Walk-in'),
+      hyrje: Number(x.total || 0),
+      dalje: 0
+    }));
+    (D.expenses || []).filter(e => alphaInPeriod(e.date || e.createdAt, fil)).forEach(e => ev.push({
+      dt: String(e.date || e.createdAt || '').slice(0, 10),
+      pershkrimi: 'Shpenzim: ' + (e.category || '') + (e.note ? ' — ' + e.note : ''),
+      hyrje: 0,
+      dalje: Number(e.amount || 0)
+    }));
+    ev.sort((a, b) => a.dt.localeCompare(b.dt));
+    let bal = 0;
+    ev.forEach(e => {
+      bal = round2(bal + e.hyrje - e.dalje);
+      rows.push({
+        rend: rows.length + 1,
+        dt: e.dt,
+        pershkrimi: e.pershkrimi,
+        hyrje: e.hyrje,
+        dalje: e.dalje,
+        balanca: bal
+      });
+      totals.hyrje += e.hyrje;
+      totals.dalje += e.dalje;
+    });
+    totals.balanca = bal;
+  }
+  const html = alphaReportHtml(spec, rows, totals);
+  return {
+    spec: spec,
+    rows: rows,
+    totals: totals,
+    html: html
+  };
 }
 function saleFatureData(sale) {
   const items = (sale.items || []).map(function (it) {
@@ -3938,6 +4440,10 @@ function Sidebar({
     id: "reports",
     icon: "fa-chart-pie",
     label: "Raportet"
+  }), React.createElement(Item, {
+    id: "alpha-reports",
+    icon: "fa-table-list",
+    label: "Raporte Alpha"
   })), React.createElement(Section, {
     title: "Inventari"
   }, React.createElement(Item, {
@@ -16263,6 +16769,160 @@ function SettingsView({
     className: "fas fa-times"
   })))))));
 }
+function AlphaReportsView({
+  user,
+  role
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const first = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const [from, setFrom] = useState(first);
+  const [to, setTo] = useState(today);
+  const [sel, setSel] = useState('Rap_BlerjeRegjistriPermbledhes');
+  const {
+    loading,
+    data
+  } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses()]), [from, to]);
+  const pos = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
+  const sales = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
+  const products = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);
+  const expenses = useMemo(() => data && data[3] && data[3].success ? data[3].data : [], [data]);
+  const built = useMemo(() => buildAlphaReport(sel, {
+    from,
+    to
+  }, {
+    pos,
+    sales,
+    products,
+    expenses
+  }), [sel, from, to, pos, sales, products, expenses]);
+  const REPORTS = [{
+    id: 'Rap_BlerjeRegjistriPermbledhes',
+    label: 'Regjistri Përmbledhës i blerjeve'
+  }, {
+    id: 'Rap_BlerjeRegjistriAnalitik',
+    label: 'Regjistri Analitik i blerjeve'
+  }, {
+    id: 'Rap_LibriShitjes',
+    label: 'Libri i Shitjeve'
+  }, {
+    id: 'Rap_ArtikujTeShitur',
+    label: 'Artikuj të shitur'
+  }, {
+    id: 'Rap_GjendjaArtikujveSasiVlere',
+    label: 'Gjendja e artikujve (sasi/vlerë)'
+  }, {
+    id: 'Rap_ArkaDitariKlasik',
+    label: 'Ditari Klasik i arkës'
+  }];
+  const doPdf = () => saveFaturePdf(built.html, sel + '.pdf');
+  const doXlsx = () => {
+    const API = window.sistemiGenitAPI;
+    if (API && API.exportAlphaXlsx) API.exportAlphaXlsx({
+      spec: built.spec,
+      rows: built.rows,
+      totals: built.totals,
+      defaultName: sel + '.xlsx'
+    }).then(res => {
+      if (res && res.success && window.Swal) Swal.fire({
+        icon: 'success',
+        title: 'Excel u ruajt',
+        text: res.path,
+        timer: 2500
+      });else if (res && !/Anuluar/.test(res.message || '') && window.Swal) Swal.fire({
+        icon: 'error',
+        title: 'Excel',
+        text: res.message || ''
+      });
+    });
+  };
+  if (loading) return React.createElement(TopLoadingBar, null);
+  return React.createElement("div", {
+    className: "data-section"
+  }, React.createElement("div", {
+    className: "section-header"
+  }, React.createElement("h2", null, React.createElement("i", {
+    className: "fas fa-table-list"
+  }), " Raporte Alpha"), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8
+    }
+  }, React.createElement("button", {
+    type: "button",
+    className: "btn btn-preview",
+    onClick: () => openHtmlDocument(built.spec.title, built.html, false)
+  }, React.createElement("i", {
+    className: "fas fa-eye"
+  }), " Preview"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: () => openHtmlDocument(built.spec.title, built.html, true)
+  }, React.createElement("i", {
+    className: "fas fa-print"
+  }), " Printo"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-pdf",
+    onClick: doPdf
+  }, React.createElement("i", {
+    className: "fas fa-file-pdf"
+  }), " PDF"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-excel",
+    onClick: doXlsx
+  }, React.createElement("i", {
+    className: "fas fa-file-excel"
+  }), " Excel"))), React.createElement("div", {
+    className: "module-toolbar"
+  }, React.createElement("div", {
+    className: "left",
+    style: {
+      display: 'flex',
+      gap: 8,
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("select", {
+    value: sel,
+    onChange: e => setSel(e.target.value),
+    style: {
+      padding: 6
+    }
+  }, REPORTS.map(r => React.createElement("option", {
+    key: r.id,
+    value: r.id
+  }, r.label))), React.createElement("label", {
+    style: {
+      color: '#808080'
+    }
+  }, "Nga"), React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: e => setFrom(e.target.value)
+  }), React.createElement("label", {
+    style: {
+      color: '#808080'
+    }
+  }, "Deri"), React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: e => setTo(e.target.value)
+  })), React.createElement("div", {
+    className: "right"
+  }, React.createElement("span", {
+    className: "type-chip"
+  }, built.rows.length, " rreshta"))), React.createElement("div", {
+    style: {
+      background: '#f5f5f5',
+      padding: 12,
+      borderRadius: 6,
+      overflow: 'auto'
+    }
+  }, React.createElement("div", {
+    dangerouslySetInnerHTML: {
+      __html: built.html
+    }
+  })));
+}
 function MainContent({
   activeMenu,
   user,
@@ -16331,6 +16991,11 @@ function MainContent({
         user: user,
         role: role,
         setActiveMenu: setActiveMenu
+      });
+    case 'alpha-reports':
+      return React.createElement(AlphaReportsView, {
+        user: user,
+        role: role
       });
     case 'records':
       return React.createElement(RecordsView, {

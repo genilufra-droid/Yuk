@@ -228,8 +228,99 @@ async function saveXlsxDialog(parentWindow, defaultName, buffer) {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Alpha WEB-style report workbook: merged grouped header, green/grey theme,
+// borders and 2-decimal numbers — mirrors alphaReportHtml exactly.
+// ---------------------------------------------------------------------------
+async function alphaXlsxBuffer(spec, rows, totals) {
+  const Excel = loadExcel();
+  const wb = new Excel.Workbook();
+  wb.creator = 'Sistemi Genit';
+  const ws = wb.addWorksheet('Sheet');
+  const GREEN = 'FF008000', GREY = 'FF808080', HEADBG = 'FFF0FFF0';
+  const thin = { style: 'thin', color: { argb: GREY } };
+  const border = { top: thin, left: thin, bottom: thin, right: thin };
+  const lead = spec.leadCols || [];
+  const nCols = lead.length + spec.columns.length;
+
+  ws.getCell(1, 1).value = spec.title;
+  ws.getCell(1, 1).font = { name: 'Calibri', bold: true, size: 16, color: { argb: GREEN } };
+  ws.getCell(1, 1).alignment = { horizontal: 'center' };
+  ws.mergeCells(1, 1, 1, nCols);
+
+  let r = 2;
+  (spec.filters || []).forEach(f => {
+    ws.getCell(r, 1).value = f.label + ' ' + (f.value == null ? '' : String(f.value));
+    ws.getCell(r, 1).font = { name: 'Times New Roman', size: 9, color: { argb: GREY } };
+    r++;
+  });
+
+  const hasGroups = !!(spec.groups && spec.groups.length);
+  const h1 = r, h2 = hasGroups ? r + 1 : r;
+  const headFont = { bold: true, size: 9, color: { argb: GREEN } };
+  if (hasGroups) {
+    let c = 1;
+    lead.forEach(l => { ws.mergeCells(h1, c, h2, c); const cell = ws.getCell(h1, c); cell.value = l.label; cell.font = headFont; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADBG } }; cell.border = border; c++; });
+    spec.groups.forEach(g => { ws.mergeCells(h1, c, h1, c + g.span - 1); const cell = ws.getCell(h1, c); cell.value = g.label; cell.font = headFont; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADBG } }; cell.border = border; for (let k = 0; k < g.span; k++) { ws.getCell(h1, c + k).border = border; } c += g.span; });
+    let c2 = lead.length + 1;
+    spec.columns.forEach(col => { const cell = ws.getCell(h2, c2); cell.value = col.label; cell.font = headFont; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADBG } }; cell.border = border; c2++; });
+  } else {
+    let c = 1;
+    lead.concat(spec.columns).forEach(col => { const cell = ws.getCell(h1, c); cell.value = col.label; cell.font = headFont; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADBG } }; cell.border = border; c++; });
+  }
+
+  let dr = h2 + 1;
+  (rows || []).forEach(row => {
+    let c = 1;
+    lead.forEach(l => { const cell = ws.getRow(dr).getCell(c); cell.value = row[l.key] == null ? '' : String(row[l.key]); cell.border = border; cell.font = { size: 9, color: { argb: GREEN } }; c++; });
+    spec.columns.forEach(col => {
+      const cell = ws.getRow(dr).getCell(c);
+      if (col.num) { cell.value = Number(row[col.key] || 0); cell.numFmt = '#,##0.00'; }
+      else cell.value = row[col.key] == null ? '' : String(row[col.key]);
+      cell.border = border; cell.font = { size: 9, color: { argb: GREEN } };
+      c++;
+    });
+    dr++;
+  });
+
+  if (totals) {
+    const cell = ws.getRow(dr).getCell(1);
+    cell.value = 'Total:';
+    cell.font = { bold: true, size: 9, color: { argb: GREEN } };
+    cell.border = { top: { style: 'medium', color: { argb: 'FF000000' } } };
+    if (lead.length + 1 < nCols) ws.mergeCells(dr, 1, dr, lead.length + 1);
+    let c = lead.length + 1;
+    spec.columns.forEach(col => {
+      const tc = ws.getRow(dr).getCell(c);
+      if (totals[col.key] != null) { tc.value = Number(totals[col.key]); tc.numFmt = '#,##0.00'; }
+      tc.font = { bold: true, size: 9, color: { argb: GREEN } };
+      tc.border = { top: { style: 'medium', color: { argb: 'FF000000' } } };
+      c++;
+    });
+    dr++;
+  }
+
+  ws.getCell(dr + 1, 1).value = 'Copyright © 2026 — Dokument i mbikëqyrur nga Sistemi Genit';
+  ws.getCell(dr + 1, 1).font = { italic: true, size: 8, color: { argb: GREEN } };
+  ws.getCell(dr + 1, nCols).value = '1/1';
+  ws.getCell(dr + 1, nCols).font = { size: 8, color: { argb: GREEN } };
+
+  for (let c = 1; c <= nCols; c++) {
+    let maxLen = 10;
+    for (let rr = 1; rr <= dr; rr++) {
+      const v = ws.getRow(rr).getCell(c).value;
+      const len = v == null ? 0 : String(v).length;
+      if (len > maxLen) maxLen = len;
+    }
+    ws.getColumn(c).width = Math.min(maxLen + 2, 40);
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
 module.exports = {
   htmlToPdf,
+  alphaXlsxBuffer,
   savePdfDialog,
   saveFileDialog,
   matrixToXlsxBuffer,
