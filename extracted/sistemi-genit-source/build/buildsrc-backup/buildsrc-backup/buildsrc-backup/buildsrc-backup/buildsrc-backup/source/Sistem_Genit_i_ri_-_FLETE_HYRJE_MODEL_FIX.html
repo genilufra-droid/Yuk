@@ -3650,7 +3650,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.0.1'
+      initializedVersion: '1.1.0'
     };
 
     try {
@@ -4824,6 +4824,21 @@ function nivfFor(id) { const h = (hashHex32('NIVF|' + id) + hashHex32('NIVF2|' +
 function saleInvoiceTypeOfficial(sale) {
   return salePaymentLabel(sale) === 'Kredi' ? 'Faturë pa para' : 'Fatura e parave të gatshme';
 }
+const FATURE_A4_CSS = '<style>' +
+  '.doc-a4{width:210mm;max-width:100%;padding:10mm;box-sizing:border-box;font-size:10.5px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}' +
+  '.doc-a4 h1{text-align:center;font-size:20px;margin:0 0 8px;letter-spacing:1px}' +
+  '.doc-a4 .box{border:1.4px solid #111;margin:0 0 6px}' +
+  '.doc-a4 .r{display:grid;grid-template-columns:42% 58%;border-bottom:1px solid #111}.doc-a4 .r:last-child{border-bottom:0}.doc-a4 .r>div{padding:4px 6px}' +
+  '.doc-a4 table{width:100%;border-collapse:collapse;font-size:9px;margin-top:6px}' +
+  '.doc-a4 th,.doc-a4 td{border:1px solid #111;padding:3px;text-align:center}.doc-a4 th{background:#eee}.doc-a4 td.l{text-align:left}' +
+  '.doc-a4 .tlabel{text-align:right}' +
+  '.doc-a4 .b{font-weight:700}' +
+  '.doc-a4 .vathead{margin:10px 0 2px;font-size:9.5px}' +
+  '.doc-a4 .vat{width:70%;margin-top:2px}' +
+  '.doc-a4 .vat td.rate{background:#cfe0ef}' +
+  '.doc-a4 .fl{margin:6px 0 0;font-size:9.5px}' +
+  '.doc-a4 .fl span{margin-left:10px}' +
+  '</style>';
 function buildFatureHtml(d) {
   const escL = (typeof esc === 'function') ? esc : function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
   let rows = (d.items || []).map(function (it) {
@@ -4834,7 +4849,7 @@ function buildFatureHtml(d) {
     return '<tr><td></td><td></td><td></td><td></td><td colspan="4" class="tlabel' + (bold ? ' b' : '') + '">' + escL(label) + '</td><td' + (bold ? ' class="b"' : '') + '>' + escL(f2(val)) + '</td></tr>';
   };
   const vat = (d.vatRows || []).map(function (r) { return '<tr><td class="rate">' + escL(f2(r.rate)) + '</td><td>' + escL(f2(r.base)) + '</td><td>' + escL(f2(r.vat)) + '</td></tr>'; }).join('');
-  return '<div class="sheet doc-a4">' +
+  return FATURE_A4_CSS + '<div class="sheet doc-a4">' +
     '<h1>FATURË</h1>' +
     '<div class="box">' +
     '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' +
@@ -8396,112 +8411,8 @@ function ThermalSlip({ sale }) {
 
 function A4InvoicePrint({ sale }) {
   if (!sale) return null;
-  const rows = sale.items || [];
-  const taxRows = saleTaxBreakdown(sale);
-  const disc = Number(sale.discount || 0);
-  return (
-    <div className="a4-invoice-print">
-      <div className="a4-title">FATURË</div>
-
-      <div className="a4-box">
-        <div className="a4-section-head">Shitësi</div>
-        <div className="a4-row"><div><span className="a4-label">Shitësi:</span></div><div>{businessName()}</div></div>
-        <div className="a4-row"><div><span className="a4-label">Adresa:</span></div><div>{businessAddress() || '—'}</div></div>
-        <div className="a4-row"><div><span className="a4-label">Numri Unik i Identifikimit:</span></div><div>{businessNipt() || '—'}</div></div>
-      </div>
-
-      <div className="a4-box">
-        <div className="a4-row"><div>Data dhe ora e lëshimit të faturës:</div><div>{formatDateForDisplay(sale.createdAt || nowIso())}</div></div>
-        <div className="a4-row"><div>Numri i Faturës:</div><div>{saleDocNo(sale)}</div></div>
-        <div className="a4-row"><div>Operatori:</div><div>{saleOperatorCode(sale)}</div></div>
-        <div className="a4-row"><div>Kodi i vendit të ushtrimit të veprimtarisë:</div><div>{saleBusinessUnitCode(sale)}</div></div>
-        <div className="a4-row"><div>Lloji i Faturës:</div><div>{saleInvoiceTypeLabel(sale)}</div></div>
-      </div>
-
-      <div className="a4-box">
-        <div className="a4-section-head">Blerësi</div>
-        <div className="a4-row"><div><span className="a4-label">Blerësi:</span></div><div>{saleBuyerName(sale)}</div></div>
-        <div className="a4-row"><div><span className="a4-label">Adresa:</span></div><div>{saleBuyerAddress(sale) || '—'}</div></div>
-        <div className="a4-row"><div><span className="a4-label">Numri Unik i Identifikimit:</span></div><div>{saleBuyerNipt(sale) || '—'}</div></div>
-      </div>
-
-      <table className="a4-table">
-        <thead>
-          <tr>
-            <th>Përshkrimi i Mallit ose Shërbimit</th>
-            <th>Njësia e Matjes</th>
-            <th>Sasia</th>
-            <th>Çmimi për njësi pa TVSH</th>
-            <th>Zbritje</th>
-            <th>Norma e TVSH</th>
-            <th>Vlera pa TVSH</th>
-            <th>TVSH</th>
-            <th>Vlera Totale</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((it, i) => (
-            <tr key={i}>
-              <td className="left">{it.name}</td>
-              <td>{it.unitName || 'copë'}</td>
-              <td>{fmtQty(it.displayQty != null ? it.displayQty : it.qty)}</td>
-              <td>{fmtLek(it.unitSalePrice || it.netUnitPrice || it.price || 0)}</td>
-              <td>{fmtLek(0)}</td>
-              <td>{fmtLek(it.taxRate != null ? it.taxRate : (CFG.taxRate || 0))}</td>
-              <td>{fmtLek(it.lineNet || 0)}</td>
-              <td>{fmtLek(it.lineTax || 0)}</td>
-              <td>{fmtLek(it.lineTotal != null ? it.lineTotal : (Number(it.lineNet||0)+Number(it.lineTax||0)))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <table className="a4-totals">
-        <tbody>
-          <tr><td>Vlera pa TVSH</td><td>{fmtLek(sale.subtotal || 0)}</td></tr>
-          {disc > 0 && <tr><td>Zbritje</td><td>{fmtLek(disc)}</td></tr>}
-          <tr><td>Vlera totale e TVSH-së</td><td>{fmtLek(sale.tax || 0)}</td></tr>
-          <tr className="grand"><td>Totali për tu paguar (LEK)</td><td>{fmtLek(sale.total || 0)}</td></tr>
-        </tbody>
-      </table>
-
-      <div className="a4-meta-line" style={{ marginTop: '5mm', fontWeight: 700 }}>Shpërndarja e TVSH-së</div>
-      <table className="a4-vat">
-        <thead>
-          <tr>
-            <th>Norma e TVSH-së</th>
-            <th>Baza e tatueshme (LEK)</th>
-            <th>Vlera e TVSH-së (LEK)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {taxRows.map((r, i) => (
-            <tr key={i}>
-              <td>{fmtLek(r.rate)}</td>
-              <td>{fmtLek(r.net)}</td>
-              <td>{fmtLek(r.tax)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <p className="a4-meta-line">Data dhe ora e kryerjes së pagesës: {formatDateForDisplay(sale.paidAt || sale.createdAt || nowIso())}</p>
-      <p className="a4-meta-line">Numri i sigurisë së lëshuesit të faturës (NSLF): <b>{saleNslf(sale)}</b></p>
-      <p className="a4-meta-line">Numri identifikues të veçantë të faturës (NIVF): <b>{saleNivf(sale)}</b></p>
-
-      <div className="a4-meta-line" style={{ fontWeight: 700, marginTop: '4mm' }}>Mënyrën e pagesës:</div>
-      <table className="a4-pay">
-        <thead><tr><th>Lloji</th><th>Sasi (LEK)</th></tr></thead>
-        <tbody><tr><td>{salePaymentLabel(sale) === 'Para' ? 'Llogari e transaksionit' : salePaymentLabel(sale)}</td><td>{fmtLek(sale.total || 0)}</td></tr></tbody>
-      </table>
-
-      <div className="a4-sign">
-        <div><div className="a4-sign-line">Shitësi</div></div>
-        <div><div className="a4-sign-line">Blerësi</div></div>
-        <div><div className="a4-sign-line">Transportuesi</div></div>
-      </div>
-    </div>
-  );
+  try { return <div dangerouslySetInnerHTML={{ __html: buildA4Html(sale) }} />; }
+  catch (e) { console.error('a4 crash', e); return <pre style={{color:'#c00',fontSize:11}}>{'Gabim: ' + String(e && e.message || e)}</pre>; }
 }
 
 function FleteDaljeSalePrint({ sale }) {
@@ -9293,16 +9204,14 @@ const kanbanColumns = useMemo(() => {
       </div>
       {loading && <TableSkeleton rows={8} columns={10} />}
       <div style={{ display: loading ? 'none' : 'block' }}>
-        {viewMode === 'list' && (
-          <>
+        <div style={{ display: viewMode === 'list' ? 'block' : 'none' }}>
             <table id="salesTable" className="display" style={{ width: '100%' }}></table>
             <FilteredSummaryBar tableRef={tableInstanceRef} deps={[tableData, qSearch, facetPay, facetStatus]} itemsBuilder={(rows) => [
               { label: 'Shitje (filtruar)', value: rows.length },
               { label: 'Totali (filtruar)', value: money(rows.reduce((s, r) => s + Number(r.total || 0), 0)) },
               { label: 'Fitimi (filtruar)', value: money(rows.reduce((s, r) => s + Number(r.profit || 0), 0)) }
             ]} />
-          </>
-        )}
+        </div>
         {viewMode === 'kanban' && <OdooKanban columns={kanbanColumns} onDropCard={onSaleKanbanDrop} />}
         {sales.length > 0 && viewMode === 'list' && <SummaryBar items={[{ label: 'Sales', value: summary.count }, { label: 'Total', value: money(summary.total) }, { label: 'Profit', value: money(summary.profit) }, { label: 'Returned', value: money(summary.returned) }]} />}
       </div>
@@ -10771,8 +10680,7 @@ const poKanban = useMemo(() => {
       </div>
       {loading && <TableSkeleton rows={8} columns={8} />}
       <div style={{ display: loading ? 'none' : 'block' }}>
-        {viewMode === 'list' && (
-          <>
+        <div style={{ display: viewMode === 'list' ? 'block' : 'none' }}>
             <table id="poTable" className="display" style={{ width: '100%' }}></table>
             <FilteredSummaryBar tableRef={tableRef} deps={[displayPOs, qSearch, facetStatus]} itemsBuilder={(rows) => [
               { label: 'Porosi (filtruar)', value: rows.length },
@@ -10780,8 +10688,7 @@ const poKanban = useMemo(() => {
               { label: 'Hapura', value: rows.filter(r => r.status !== 'received' && r.status !== 'cancelled').length }
             ]} />
             {pos.length > 0 && <SummaryBar items={[{ label: 'POs', value: poSummary.count }, { label: 'Total Value', value: money(poSummary.total) }, { label: 'Open (unreceived)', value: money(poSummary.open) }]} />}
-          </>
-        )}
+          </div>
         {viewMode === 'kanban' && <OdooKanban columns={poKanban} onDropCard={onPoKanbanDrop} />}
       </div>
       {showModal && <PurchaseOrderModal suppliers={suppliers} products={products} onClose={() => setShowModal(false)} onSave={handleSave} />}

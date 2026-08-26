@@ -665,11 +665,13 @@ function buildAlphaReport(id, fil, D) {
   if (fil.supplierId) D.pos = (D.pos || []).filter(x => x.supplierId === fil.supplierId);
   if (fil.customerId) D.sales = (D.sales || []).filter(x => x.customerId === fil.customerId || (x.customerName || 'Walk-in') === fil.customerId);
   if (fil.pay) D.sales = (D.sales || []).filter(x => (x.paymentMethod || 'Para') === fil.pay);
+  const origMoves = D.moves || [];
   if (fil.warehouse) D.moves = (D.moves || []).filter(v => (v.warehouse || 'Magazina Kryesore') === fil.warehouse);
   if (fil.productId) {
     D.moves = (D.moves || []).filter(v => v.productId === fil.productId);
     D.products = (D.products || []).filter(pr => pr.id === fil.productId);
   }
+  D.movesAll = origMoves.filter(v => (!fil.warehouse || (v.warehouse || 'Magazina Kryesore') === fil.warehouse) && (!fil.productId || v.productId === fil.productId) && (!fil.to || String(v.createdAt || '').slice(0, 10) <= fil.to));
   if (fil.moveType) D.moves = (D.moves || []).filter(v => v.type === fil.moveType);
   if (fil.expCat) D.expenses = (D.expenses || []).filter(e => (e.category || '') === fil.expCat);
   if (fil.q) {
@@ -16831,9 +16833,9 @@ function SettingsView({
     className: "fas fa-times"
   })))))));
 }
-function alphaWhStock(D) {
+function alphaWhStock(D, list) {
   const m = {};
-  (D.moves || []).forEach(v => {
+  (list || D.moves || []).forEach(v => {
     const pid = v.productId || '';
     if (!m[pid]) m[pid] = {
       total: 0,
@@ -16847,7 +16849,7 @@ function alphaWhStock(D) {
   return m;
 }
 function alphaStockValue(D) {
-  const ws = alphaWhStock(D);
+  const ws = alphaWhStock(D, D.movesAll);
   let val = 0;
   (D.products || []).forEach(p => {
     val += (ws[p.id] ? ws[p.id].total : Number(p.stock || 0)) * Number(p.cost || 0);
@@ -17309,7 +17311,7 @@ function alphaExtraReports(id, fil, D) {
       m[k].sasiaS += Number(it.displayQty != null ? it.displayQty : it.qty) || 0;
       m[k].vleraS += Number(it.lineTotal || 0);
     }));
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => {
       if (m[pr.name]) m[pr.name].gjendja = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0);
     });
@@ -17496,7 +17498,7 @@ function alphaExtraReports(id, fil, D) {
       sasia: 0,
       vlera: 0
     };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => {
       const q = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0);
       rows.push({
@@ -17539,7 +17541,7 @@ function alphaExtraReports(id, fil, D) {
       sasia: 0,
       vlera: 0
     };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => {
       const w = ws[pr.id] ? ws[pr.id].wh : {};
       Object.keys(w).forEach(mg => {
@@ -17589,7 +17591,7 @@ function alphaExtraReports(id, fil, D) {
       vlerab: 0,
       vleras: 0
     };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     (D.products || []).forEach(pr => {
       const w = ws[pr.id] ? ws[pr.id].wh : {};
       const q = ws[pr.id] ? ws[pr.id].total : Number(pr.stock || 0);
@@ -17650,7 +17652,7 @@ function alphaExtraReports(id, fil, D) {
     };
     const pid = fil.productId || '';
     let bal = 0;
-    (D.moves || []).filter(v => (!pid || v.productId === pid) && (!onlySales || v.reason === 'Sale') && alphaInPeriod(v.createdAt, fil)).forEach(v => {
+    (D.movesAll || []).filter(v => (!pid || v.productId === pid) && (!onlySales || v.reason === 'Sale')).forEach(v => {
       const q = Number(v.qty || 0);
       const inn = v.type === 'in' ? q : 0;
       const out = v.type === 'out' ? q : 0;
@@ -17761,7 +17763,7 @@ function alphaExtraReports(id, fil, D) {
       vlerab: 0,
       vleras: 0
     };
-    const ws = alphaWhStock(D);
+    const ws = alphaWhStock(D, D.movesAll);
     const agg = {};
     (D.products || []).forEach(pr => {
       const w = ws[pr.id] ? ws[pr.id].wh : {};
@@ -17864,8 +17866,8 @@ function alphaExtraReports(id, fil, D) {
     };
     const now = new Date();
     (D.products || []).forEach(pr => {
-      const ins = (D.moves || []).filter(v => v.productId === pr.id && v.type === 'in').sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
-      const outs = (D.moves || []).filter(v => v.productId === pr.id && v.type === 'out').reduce((a, v) => a + Number(v.qty || 0), 0);
+      const ins = (D.movesAll || []).filter(v => v.productId === pr.id && v.type === 'in').sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+      const outs = (D.movesAll || []).filter(v => v.productId === pr.id && v.type === 'out').reduce((a, v) => a + Number(v.qty || 0), 0);
       let remainOut = outs;
       const buckets = {
         b0_30: 0,
@@ -18914,7 +18916,7 @@ function AlphaReportsView({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const first = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(first);
+  const [from, setFrom] = useState('');
   const [to, setTo] = useState(today);
   const [sel, setSel] = useState('Rap_BlerjeRegjistriPermbledhes');
   const [productId, setProductId] = useState('');
