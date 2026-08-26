@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.2.5'
+      initializedVersion: '1.3.0'
     };
 
     try {
@@ -4581,7 +4581,7 @@ const ROLE_RIGHTS = {
   Admin: { all: true },
   Manager: {
     dashboard: true, pos: true, products: true, stock: true, 'sales-history': true, reports: true,
-    records: true, suppliers: true, 'purchase-orders': true, 'warehouse-receipts-in': true, expenses: true, users: false, settings: false, logs: true, about: true, 'import-export': true,
+    records: true, suppliers: true, 'purchase-orders': true, 'supplier-payments': true, 'warehouse-receipts-in': true, expenses: true, users: false, settings: false, logs: true, about: true, 'import-export': true,
     canCreate: true, canEdit: true, canDelete: true, canExport: true
   },
   Sales: {
@@ -4591,7 +4591,7 @@ const ROLE_RIGHTS = {
   },
   Warehouse: {
     dashboard: true, pos: false, products: true, stock: true, 'sales-history': false, reports: true,
-    records: false, suppliers: true, 'purchase-orders': true, 'warehouse-receipts-in': true, expenses: false, users: false, settings: false, logs: false, about: true, 'import-export': false,
+    records: false, suppliers: true, 'purchase-orders': true, 'supplier-payments': true, 'warehouse-receipts-in': true, expenses: false, users: false, settings: false, logs: false, about: true, 'import-export': false,
     canCreate: true, canEdit: true, canDelete: false, canExport: true
   },
   User: {
@@ -4604,7 +4604,7 @@ const ROLE_RIGHTS = {
 const RIGHT_LABELS = {
   dashboard: 'Paneli', pos: 'POS / Shitje', products: 'Produktet', stock: 'Inventari',
   'sales-history': 'Porositë', reports: 'Raportet', 'alpha-reports': 'Raporte Alpha', records: 'Klientët', suppliers: 'Furnitorët',
-  'purchase-orders': 'Porosi blerje', 'warehouse-receipts-in': 'Fletë Hyrje', expenses: 'Shpenzimet', users: 'Përdoruesit', settings: 'Cilësimet',
+  'purchase-orders': 'Porosi blerje', 'supplier-payments': 'Pagesa furnitorësh', 'warehouse-receipts-in': 'Fletë Hyrje', expenses: 'Shpenzimet', users: 'Përdoruesit', settings: 'Cilësimet',
   logs: 'Aktiviteti', about: 'Rreth', 'import-export': 'Import/Eksport', canCreate: 'Krijon', canEdit: 'Ndryshon', canDelete: 'Fshin', canExport: 'Eksport PDF/Excel'
 };
 
@@ -4881,6 +4881,37 @@ function buildFatureHtml(d) {
     '</div>';
 }
 // ===========================================================================
+// Supplier payments (Pagesa furnitorësh) — cash/bank/credit, auto mandate
+// number (Mandat Pagese), linked to the purchase invoice; reflected in
+// reports, arka and traceability chain.
+// ===========================================================================
+async function fbGetSupplierPayments() {
+  try {
+    const snap = await db.ref('supplier_payments').once('value');
+    const val = snap.val() || {};
+    const arr = Object.entries(val).map(function (e) { return Object.assign({ id: e[0] }, e[1]); });
+    arr.sort(function (a, b) { return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0); });
+    return { success: true, data: arr };
+  } catch (e) { return { success: false, message: e.message, data: [] }; }
+}
+async function fbCreateSupplierPayment(pay, user) {
+  try {
+    const id = 'sp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const mandate = 'MP-' + String(Date.now()).slice(-6);
+    const rec = Object.assign({}, pay, { id: id, mandate: mandate, createdBy: user && (user.name || user.email) || '', createdAt: new Date().toISOString() });
+    await db.ref('supplier_payments/' + id).set(rec);
+    if (pay.poId) {
+      const snap = await db.ref('purchase_orders/' + pay.poId).once('value');
+      const po = snap.val() || {};
+      const paid = round2(Number(po.paidTotal || 0) + Number(pay.amount || 0));
+      await db.ref('purchase_orders/' + pay.poId).update({ paidTotal: paid, payStatus: paid >= Number(po.total || 0) ? 'paid' : 'partial' });
+    }
+    try { window.dispatchEvent(new CustomEvent('erp-data-changed', { detail: { tableId: 'payTable' } })); } catch (e) {}
+    return { success: true, data: rec, message: 'Pagesa u ruajt — Mandati ' + mandate };
+  } catch (e) { return { success: false, message: e.message }; }
+}
+
+// ===========================================================================
 // ALPHA WEB report engine — identical HTML (screen/print/PDF) and XLSX output.
 // ===========================================================================
 function alphaCss() {
@@ -5023,6 +5054,7 @@ function buildAlphaReport(id, fil, D) {
     const ev = [];
     (D.sales || []).filter(x => x.status !== 'cancelled' && x.paymentMethod !== 'Credit' && alphaInPeriod(x.createdAt, fil)).forEach(x => ev.push({ dt: String(x.createdAt || '').slice(0, 10), pershkrimi: 'Faturë ' + (x.invoiceNo || '') + ' — ' + (x.customerName || 'Walk-in'), hyrje: Number(x.total || 0), dalje: 0, _link: 'sale', _id: x.id }));
     (D.expenses || []).filter(e => alphaInPeriod(e.date || e.createdAt, fil)).forEach(e => ev.push({ dt: String(e.date || e.createdAt || '').slice(0, 10), pershkrimi: 'Shpenzim: ' + (e.category || '') + (e.note ? ' — ' + e.note : ''), hyrje: 0, dalje: Number(e.amount || 0) }));
+    (D.payments || []).filter(x => alphaInPeriod(x.date || x.createdAt, fil)).forEach(x => ev.push({ dt: String(x.date || x.createdAt || '').slice(0, 10), pershkrimi: 'Mandat ' + (x.mandate || '') + ' — ' + (x.supplierName || ''), hyrje: 0, dalje: Number(x.amount || 0), _link: x.poId ? 'po' : '', _id: x.poId || '' }));
     ev.sort((a, b) => a.dt.localeCompare(b.dt));
     let bal = 0;
     ev.forEach(e => { bal = round2(bal + e.hyrje - e.dalje); rows.push({ rend: rows.length + 1, _link: e._link || '', _id: e._id || '', dt: e.dt, pershkrimi: e.pershkrimi, hyrje: e.hyrje, dalje: e.dalje, balanca: bal }); totals.hyrje += e.hyrje; totals.dalje += e.dalje; });
@@ -7122,6 +7154,7 @@ function Sidebar({ activeMenu, setActiveMenu, role, user, onLogout, collapsed })
         <Section title="Blerjet">
           <Item id="suppliers" icon="fa-truck-field" label="Furnitorët" />
           <Item id="purchase-orders" icon="fa-bag-shopping" label="Porosi blerje" />
+          <Item id="supplier-payments" icon="fa-money-check-dollar" label="Pagesa furnitorësh" />
           <Item id="warehouse-receipts-in" icon="fa-box-open" label="Fletë Hyrje" />
         </Section>
         <Section title="Kontabilitet">
@@ -8691,6 +8724,7 @@ function FleteHyrjePrint({ receipt }) {
 }
 
 function WarehouseReceiptInOverlay({ receipt, onClose }) {
+  const [trace, setTrace] = useState(false);
   if (!receipt) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -8702,6 +8736,8 @@ function WarehouseReceiptInOverlay({ receipt, onClose }) {
             <button type="button" className="btn btn-primary" onClick={() => openWarehouseReceiptInDocument(receipt, true)}><i className="fas fa-print"></i> Printo</button>
             <button type="button" className="btn btn-pdf" onClick={() => exportWarehouseInPdf(receipt)}><i className="fas fa-file-pdf"></i> PDF</button>
             <button type="button" className="btn btn-excel" onClick={() => exportWarehouseInXlsx(receipt)}><i className="fas fa-file-excel"></i> Excel</button>
+            <button type="button" className="btn btn-preview" onClick={() => setTrace(true)}><i className="fas fa-diagram-project"></i> Gjurmueshmëria</button>
+            {trace && <TraceModal kind="receipt" id={receipt.id} onClose={() => setTrace(false)} />}
           </div>
           <div style={{ background:'#f5f5f5', padding:12, borderRadius:6, overflow:'auto', maxHeight:'65vh', width:'100%' }}>
             <div style={{ background:'#fff', margin:'0 auto', width:'fit-content' }}><FleteHyrjePrint receipt={receipt} /></div>
@@ -8715,6 +8751,7 @@ function WarehouseReceiptInOverlay({ receipt, onClose }) {
 
 function ThermalReceiptOverlay({ sale, onClose }) {
   const [docMode, setDocMode] = useState('thermal'); // thermal | a4 | warehouse
+  const [trace, setTrace] = useState(false);
   useEffect(() => { setLastDocSale(sale); }, [sale]);
   if (!sale) return null;
   return (
@@ -8723,6 +8760,8 @@ function ThermalReceiptOverlay({ sale, onClose }) {
         <div className="modal-header"><h3><i className="fas fa-receipt"></i> Fatura / Fletë Dalje</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
         <div className="modal-body thermal-slip-modal-body">
           <div className="erp-export-bar" style={{ width:'100%', marginBottom:10 }}>
+            <button type="button" className="btn btn-preview" onClick={() => setTrace(true)}><i className="fas fa-diagram-project"></i> Gjurmueshmëria</button>
+            {trace && <TraceModal kind="sale" id={sale.id} onClose={() => setTrace(false)} />}
             <button type="button" className={'btn ' + (docMode==='thermal'?'btn-primary':'btn-secondary')} onClick={() => setDocMode('thermal')}><i className="fas fa-receipt"></i> Termik</button>
             <button type="button" className={'btn ' + (docMode==='a4'?'btn-primary':'btn-secondary')} onClick={() => setDocMode('a4')}><i className="fas fa-file-invoice"></i> A4</button>
             <button type="button" className={'btn ' + (docMode==='warehouse'?'btn-primary':'btn-secondary')} onClick={() => setDocMode('warehouse')}><i className="fas fa-warehouse"></i> Fletë Dalje</button>
@@ -9844,7 +9883,7 @@ function ReportsView({ user, role, setActiveMenu }) {
   const emptyFilters = { from: firstDay, to: today, q: '', productId: '', customerId: '', supplierId: '', unitKey: '', price: '', warehouse: '' };
   const [tab, setTab] = useState('sales');
   const [filters, setFilters] = useState(emptyFilters);
-  const { loading, data, err } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn()]), []);
+  const { loading, data, err } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), []);
 
   const sales = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
   const products = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
@@ -9855,6 +9894,7 @@ function ReportsView({ user, role, setActiveMenu }) {
   const suppliers = useMemo(() => (data && data[6] && data[6].success ? data[6].data : []), [data]);
   const returns = useMemo(() => (data && data[7] && data[7].success ? data[7].data : []), [data]);
   const receipts = useMemo(() => (data && data[8] && data[8].success ? data[8].data : []), [data]);
+  const supPays = useMemo(() => (data && data[9] && data[9].success ? data[9].data : []), [data]);
   const productById = useMemo(() => products.reduce((m, p) => (m[p.id] = p, m), {}), [products]);
   const customerById = useMemo(() => customers.reduce((m, c) => (m[c.id] = c, m), {}), [customers]);
   const supplierById = useMemo(() => suppliers.reduce((m, s) => (m[s.id] = s, m), {}), [suppliers]);
@@ -9963,7 +10003,7 @@ function ReportsView({ user, role, setActiveMenu }) {
   const expenseCategoryRows = reportGroup(expenseRows, e => e.category || '-', e => ({ category: e.category || '-', count: 0, amount: 0 }), (row, e) => { row.count += 1; row.amount += Number(e.amount || 0); }).sort((a,b)=>b.amount-a.amount);
   const netProfit = grossProfit - expenseTotal - returnsTotal;
 
-  const purchaseRows = filteredPurchases.map(p => ({ poNumber: p.poNumber || '-', date: p.createdAt, supplier: p.supplierName || '-', items: (p.items || []).length, qty: purchaseLines.filter(l => l.poId === p.id).reduce((a, it) => a + Number(it.qty || 0), 0), unitSummary: (p.items || []).map(it => (it.enteredQty != null ? it.enteredQty : it.qty) + ' ' + (it.unitName || 'copë')).join(', '), total: Number(p.total) || 0, status: p.status || '-', poId: p.id }));
+  const purchaseRows = filteredPurchases.map(p => ({ poNumber: p.poNumber || '-', date: p.createdAt, supplier: p.supplierName || '-', items: (p.items || []).length, qty: purchaseLines.filter(l => l.poId === p.id).reduce((a, it) => a + Number(it.qty || 0), 0), unitSummary: (p.items || []).map(it => (it.enteredQty != null ? it.enteredQty : it.qty) + ' ' + (it.unitName || 'copë')).join(', '), total: Number(p.total) || 0, status: p.status || '-', poId: p.id, payStatus: Number(p.total || 0) > 0 ? (Number(p.paidTotal || 0) >= Number(p.total || 0) ? 'E paguar' : (Number(p.paidTotal || 0) > 0 ? 'Pjesërisht' : 'E papaguar')) : '-' }));
   const purchaseTotal = purchaseLines.reduce((a, r) => a + Number(r.lineTotal || 0), 0);
   const purchaseItemRows = reportGroup(purchaseLines, l => (l.productId || l.productName || 'unknown') + '|' + (l.unitKey || 'base'), l => ({ name: l.productName || '-', sku: l.sku || '-', unit: l.unitName || '-', qty: 0, qtyBase: 0, cost: 0, avgCost: 0, suppliers: new Set() }), (row, l) => { row.suppliers.add(l.supplierName || '-'); row.qty += Number(l.displayQty || 0); row.qtyBase += Number(l.qty || 0); row.cost += Number(l.lineTotal || 0); row.avgCost = row.qty ? row.cost / row.qty : 0; }).map(r => Object.assign({}, r, { suppliersText: Array.from(r.suppliers).join(', ') })).sort((a,b)=>b.cost-a.cost);
   const supplierPurchaseRows = reportGroup(filteredPurchases, p => p.supplierName || '-', p => ({ supplier: p.supplierName || '-', pos: 0, qty: 0, total: 0, lastPurchase: p.createdAt }), (row, p) => { row.pos += 1; row.qty += purchaseLines.filter(l => l.poId === p.id).reduce((a,it)=>a+Number(it.qty||0),0); row.total += Number(p.total||0); if (new Date(p.createdAt) > new Date(row.lastPurchase)) row.lastPurchase = p.createdAt; }).sort((a,b)=>b.total-a.total);
@@ -10018,8 +10058,9 @@ function ReportsView({ user, role, setActiveMenu }) {
     if (filters.warehouse && r.warehouse && r.warehouse !== filters.warehouse) return false;
     return true;
   });
-  const supplierLedgerRows = (() => { const rows = []; suppliers.forEach(sup => { if (filters.supplierId && sup.id !== filters.supplierId) return; let bal = Number(sup.openingBalance || 0); if (bal) rows.push({ date:'', supplier:sup.name, type:'Çelje', doc:'Balancë fillestare', debit:bal, credit:0, balance:bal }); filteredPurchases.filter(p => p.supplierId === sup.id || p.supplierName === sup.name).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt)).forEach(p => { bal += Number(p.total || 0); rows.push({ date:p.createdAt, supplier:sup.name, type:'Faturë blerje', doc:p.poNumber || '-', debit:Number(p.total||0), credit:0, balance:bal, poId:p.id }); }); expenseRows.filter(e => e.vendor === sup.name).sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(e => { bal -= Number(e.amount||0); rows.push({ date:e.date, supplier:sup.name, type:'Pagesë', doc:e.category || 'Pagesë', debit:0, credit:Number(e.amount||0), balance:bal }); }); }); return rows.filter(r => reportMatch(filters.q, r.supplier, r.type, r.doc)).sort((a,b)=>String(a.supplier).localeCompare(String(b.supplier)) || new Date(a.date||0)-new Date(b.date||0)); })();
-  const billingRows = [].concat(filteredSales.map(s => ({ date:s.createdAt, party:s.customerName || 'Walk-in', kind:'Klient', type:'Faturim shitje', doc:s.invoiceNo || '-', saleId:s.id, invoice:Number(s.total||0), payment:s.paymentMethod === 'Credit' ? 0 : Number(s.total||0), balance:s.paymentMethod === 'Credit' ? Number(s.total||0) : 0 })), filteredPurchases.map(p => ({ date:p.createdAt, party:p.supplierName || '-', kind:'Furnitor', type:'Faturim blerje', doc:p.poNumber || '-', poId:p.id, invoice:Number(p.total||0), payment:0, balance:Number(p.total||0) })), expenseRows.map(e => ({ date:e.date, party:e.vendor || '-', kind:'Pagesë', type:'Pagesë furnitori/shpenzim', doc:e.category || '-', invoice:0, payment:Number(e.amount||0), balance:-Number(e.amount||0) }))).filter(r => {
+  const supplierLedgerRows = (() => { const rows = []; suppliers.forEach(sup => { if (filters.supplierId && sup.id !== filters.supplierId) return; let bal = Number(sup.openingBalance || 0); if (bal) rows.push({ date:'', supplier:sup.name, type:'Çelje', doc:'Balancë fillestare', debit:bal, credit:0, balance:bal }); filteredPurchases.filter(p => p.supplierId === sup.id || p.supplierName === sup.name).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt)).forEach(p => { bal += Number(p.total || 0); rows.push({ date:p.createdAt, supplier:sup.name, type:'Faturë blerje', doc:p.poNumber || '-', debit:Number(p.total||0), credit:0, balance:bal, poId:p.id }); }); supPays.filter(x => x.supplierId === sup.id || x.supplierName === sup.name).sort((a,b)=>new Date(a.date||a.createdAt)-new Date(b.date||b.createdAt)).forEach(x => { bal -= Number(x.amount||0); rows.push({ date:x.date||x.createdAt, supplier:sup.name, type:'Pagesë (mandat)', doc:(x.mandate||'')+(x.poNumber?' / '+x.poNumber:''), debit:0, credit:Number(x.amount||0), balance:bal, poId:x.poId }); });
+      expenseRows.filter(e => e.vendor === sup.name).sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(e => { bal -= Number(e.amount||0); rows.push({ date:e.date, supplier:sup.name, type:'Pagesë', doc:e.category || 'Pagesë', debit:0, credit:Number(e.amount||0), balance:bal }); }); }); return rows.filter(r => reportMatch(filters.q, r.supplier, r.type, r.doc)).sort((a,b)=>String(a.supplier).localeCompare(String(b.supplier)) || new Date(a.date||0)-new Date(b.date||0)); })();
+  const billingRows = [].concat(filteredSales.map(s => ({ date:s.createdAt, party:s.customerName || 'Walk-in', kind:'Klient', type:'Faturim shitje', doc:s.invoiceNo || '-', saleId:s.id, invoice:Number(s.total||0), payment:s.paymentMethod === 'Credit' ? 0 : Number(s.total||0), balance:s.paymentMethod === 'Credit' ? Number(s.total||0) : 0 })), filteredPurchases.map(p => ({ date:p.createdAt, party:p.supplierName || '-', kind:'Furnitor', type:'Faturim blerje', doc:p.poNumber || '-', poId:p.id, invoice:Number(p.total||0), payment:0, balance:Number(p.total||0) })), expenseRows.map(e => ({ date:e.date, party:e.vendor || '-', kind:'Pagesë', type:'Pagesë furnitori/shpenzim', doc:e.category || '-', invoice:0, payment:Number(e.amount||0), balance:-Number(e.amount||0) })), supPays.map(x => ({ date:x.date||x.createdAt, party:x.supplierName||'-', kind:'Furnitor', type:'Pagesë (mandat)', doc:x.mandate||'-', invoice:0, payment:Number(x.amount||0), balance:-Number(x.amount||0), poId:x.poId }))).filter(r => {
     if (filters.customerId) {
       const c = customerById[filters.customerId];
       if (!(r.kind === 'Klient' && c && r.party === c.name)) return false;
@@ -10137,7 +10178,7 @@ function ReportsView({ user, role, setActiveMenu }) {
       {tab === 'lowStock' && <ReportTable filters={activeFilters} title="Raport Stok i Ulët" icon="fa-triangle-exclamation" rows={lowStockRows} totals={{ qty: lowStockRows.reduce((a,r)=>a+r.qty,0), suggested: lowStockRows.reduce((a,r)=>a+r.suggested,0), value: money(lowStockRows.reduce((a,r)=>a+r.value,0)) }} columns={[{ key:'name', label:'Artikulli', value:r => r.name }, { key:'sku', label:'Kodi', value:r => r.sku }, { key:'category', label:'Kategoria', value:r => r.category }, { key:'warehouse', label:'Magazina', value:r => r.warehouse }, { key:'qty2', label:'Gjendje dy njësi', value:r => r.qty2 }, { key:'reorder', label:'Minimum', value:r => r.reorder }, { key:'suggested', label:'Duhet furnizuar', value:r => r.suggested }, { key:'value', label:'Vlera kosto', value:r => money(r.value) }]} />}
       {tab === 'slow' && <ReportTable filters={activeFilters} title="Artikuj pa Shitje në Periudhë" icon="fa-hourglass-half" rows={slowRows} totals={{ qty: slowRows.reduce((a,r)=>a+r.qty,0), value: money(slowRows.reduce((a,r)=>a+r.value,0)) }} columns={[{ key:'name', label:'Artikulli', value:r => r.name }, { key:'sku', label:'Kodi', value:r => r.sku }, { key:'category', label:'Kategoria', value:r => r.category }, { key:'warehouse', label:'Magazina', value:r => r.warehouse }, { key:'qty2', label:'Gjendje dy njësi', value:r => r.qty2 }, { key:'value', label:'Vlera stoku', value:r => money(r.value) }, { key:'lastSold', label:'Shitja e fundit', value:r => r.lastSold }]} />}
       {tab === 'reorder' && <ReportTable filters={activeFilters} title="Kërkesë Furnizimi" icon="fa-cart-plus" rows={reorderRows} totals={{ qty: reorderRows.reduce((a,r)=>a+r.qty,0), orderQty: reorderRows.reduce((a,r)=>a+r.orderQty,0) }} columns={[{ key:'name', label:'Artikulli', value:r => r.name }, { key:'sku', label:'Kodi', value:r => r.sku }, { key:'category', label:'Kategoria', value:r => r.category }, { key:'warehouse', label:'Magazina', value:r => r.warehouse }, { key:'qty2', label:'Gjendje dy njësi', value:r => r.qty2 }, { key:'reorder', label:'Minimum', value:r => r.reorder }, { key:'orderQty', label:'Sasia për porosi', value:r => r.orderQty }, { key:'cost', label:'Kosto', value:r => money(r.cost) }, { key:'value', label:'Vlera porosie', value:r => money(r.orderQty * r.cost) }]} />}
-      {tab === 'purchases' && <ReportTable filters={activeFilters} title="Raport Blerjesh" icon="fa-file-invoice-dollar" rows={purchaseRows} totals={{ items: purchaseRows.reduce((a,r)=>a+r.items,0), qty: purchaseRows.reduce((a,r)=>a+r.qty,0), total: money(purchaseRows.reduce((a,r)=>a+r.total,0)) }} columns={[{ key:'poNumber', label:'Nr. Porosie', value:r => r.poId ? <button type="button" className="doc-link" data-doc="po" data-id={r.poId}><i className="fas fa-arrow-right"></i>{r.poNumber}</button> : r.poNumber }, { key:'date', label:'Data', value:r => reportDateOnly(r.date) }, { key:'supplier', label:'Furnitori', value:r => r.supplier }, { key:'items', label:'Rreshta', value:r => r.items }, { key:'unitSummary', label:'Njësitë', value:r => r.unitSummary }, { key:'qty', label:'Sasia bazë', value:r => r.qty }, { key:'status', label:'Statusi', value:r => r.status }, { key:'total', label:'Totali', value:r => money(r.total) }]} />}
+      {tab === 'purchases' && <ReportTable filters={activeFilters} title="Raport Blerjesh" icon="fa-file-invoice-dollar" rows={purchaseRows} totals={{ items: purchaseRows.reduce((a,r)=>a+r.items,0), qty: purchaseRows.reduce((a,r)=>a+r.qty,0), total: money(purchaseRows.reduce((a,r)=>a+r.total,0)) }} columns={[{ key:'poNumber', label:'Nr. Porosie', value:r => r.poId ? <button type="button" className="doc-link" data-doc="po" data-id={r.poId}><i className="fas fa-arrow-right"></i>{r.poNumber}</button> : r.poNumber }, { key:'date', label:'Data', value:r => reportDateOnly(r.date) }, { key:'supplier', label:'Furnitori', value:r => r.supplier }, { key:'items', label:'Rreshta', value:r => r.items }, { key:'unitSummary', label:'Njësitë', value:r => r.unitSummary }, { key:'qty', label:'Sasia bazë', value:r => r.qty }, { key:'status', label:'Statusi', value:r => r.status }, { key:'payStatus', label:'Pagesa', value:r => r.payStatus }, { key:'total', label:'Totali', value:r => money(r.total) }]} />}
       {tab === 'purchaseItems' && <ReportTable filters={activeFilters} title="Blerje sipas Artikullit" icon="fa-box-open" rows={purchaseItemRows} totals={{ qtyBase: purchaseItemRows.reduce((a,r)=>a+r.qtyBase,0), cost: money(purchaseItemRows.reduce((a,r)=>a+r.cost,0)) }} columns={[{ key:'name', label:'Artikulli', value:r => r.name }, { key:'sku', label:'Kodi', value:r => r.sku }, { key:'unit', label:'Njësia', value:r => r.unit }, { key:'qty', label:'Sasia blerë', value:r => r.qty }, { key:'qtyBase', label:'Sasi bazë', value:r => r.qtyBase }, { key:'suppliers', label:'Furnitorë', value:r => r.suppliersText }, { key:'avgCost', label:'Kosto mesatare', value:r => money(r.avgCost) }, { key:'cost', label:'Vlera blerje', value:r => money(r.cost) }]} />}
       {tab === 'suppliers' && <ReportTable filters={activeFilters} title="Blerje sipas Furnitorit" icon="fa-truck-field" rows={supplierPurchaseRows} totals={{ pos: supplierPurchaseRows.reduce((a,r)=>a+r.pos,0), qty: supplierPurchaseRows.reduce((a,r)=>a+r.qty,0), total: money(supplierPurchaseRows.reduce((a,r)=>a+r.total,0)) }} columns={[{ key:'supplier', label:'Furnitori', value:r => r.supplier }, { key:'pos', label:'Porosi', value:r => r.pos }, { key:'qty', label:'Sasia bazë', value:r => r.qty }, { key:'total', label:'Blerje', value:r => money(r.total) }, { key:'lastPurchase', label:'Blerja e fundit', value:r => reportDateOnly(r.lastPurchase) }]} />}
       {tab === 'profit' && <div><ReportKpis items={[{ label:'Shitje', value: money(salesTotal) }, { label:'Kosto mallrash', value: money(itemRows.reduce((a,r)=>a+r.cost,0)) }, { label:'Shpenzime', value: money(expenseTotal) }, { label:'Fitim neto', value: money(netProfit) }]} /><ReportTable filters={activeFilters} title="Fitim & Humbje" icon="fa-chart-line" rows={[{ name:'Shitje bruto', amount:salesTotal }, { name:'Kthime shitje', amount:-returnsTotal }, { name:'Kosto mallrash', amount:-itemRows.reduce((a,r)=>a+r.cost,0) }, { name:'Fitim bruto', amount:grossProfit - returnsTotal }, { name:'Shpenzime operative', amount:-expenseTotal }, { name:'Fitim neto', amount:netProfit }]} totals={{ amount: money(netProfit) }} columns={[{ key:'name', label:'Përshkrimi', value:r => r.name }, { key:'amount', label:'Shuma', value:r => money(r.amount) }]} /></div>}
@@ -10569,6 +10610,7 @@ function PurchaseOrderModal({ suppliers, products, onClose, onSave }) {
 
 // --- PO detail + receive ---
 function PoDetailModal({ po, onClose, onReceive, supplier }) {
+  const [trace, setTrace] = useState(false);
   if (!po) return null;
   const receivable = po.status !== 'received' && po.status !== 'cancelled';
   const stages = [
@@ -10590,6 +10632,8 @@ function PoDetailModal({ po, onClose, onReceive, supplier }) {
           <button type="button" className="btn btn-primary" onClick={() => openPurchaseDocument(po, supplier, true)}><i className="fas fa-print"></i> Printo</button>
           <button type="button" className="btn btn-pdf" onClick={() => exportPurchasePdf(po, supplier)}><i className="fas fa-file-pdf"></i> PDF</button>
           <button type="button" className="btn btn-excel" onClick={() => exportPurchaseXlsx(po, supplier)}><i className="fas fa-file-excel"></i> Excel</button>
+          <button type="button" className="btn btn-preview" onClick={() => setTrace(true)}><i className="fas fa-diagram-project"></i> Gjurmueshmëria</button>
+          {trace && <TraceModal kind="po" id={po.id} onClose={() => setTrace(false)} />}
           <button type="button" className="btn btn-secondary" onClick={onClose}>Mbyll</button>
         </>
       }
@@ -12470,7 +12514,9 @@ function alphaFin(D, fil) {
   const cashIn = round2(sales.filter(x => x.paymentMethod !== 'Credit').reduce((a, x) => a + Number(x.total || 0), 0));
   const receivables = round2(sales.filter(x => x.paymentMethod === 'Credit').reduce((a, x) => a + Number(x.total || 0), 0));
   const inventory = alphaStockValue(D);
-  const cash = round2(cashIn - purchases - expenses);
+  const supPays = (D.payments || []).filter(x => alphaInPeriod(x.date || x.createdAt, fil));
+  const paidOut = round2(supPays.filter(x => (x.method || 'Para') !== 'Kredi' && (x.method || '') !== 'Vonë').reduce((a, x) => a + Number(x.amount || 0), 0));
+  const cash = round2(cashIn - paidOut - expenses);
   const profit = round2(revenue - purchases - expenses);
   const events = [];
   sales.forEach(x => { const dt = String(x.createdAt || '').slice(0, 10);
@@ -12480,6 +12526,7 @@ function alphaFin(D, fil) {
   });
   pos.forEach(p => { const dt = String(p.createdAt || '').slice(0, 10); events.push({ dt, acc: '5000', d: Number(p.total || 0), k: 0, desc: 'Blerje ' + (p.poNumber || '') }); events.push({ dt, acc: '1000', d: 0, k: Number(p.total || 0), desc: 'Pagesë furnitor ' + (p.poNumber || '') }); });
   exp.forEach(e => { const dt = String(e.date || e.createdAt || '').slice(0, 10); events.push({ dt, acc: '5000', d: Number(e.amount || 0), k: 0, desc: 'Shpenzim ' + (e.category || '') }); events.push({ dt, acc: '1000', d: 0, k: Number(e.amount || 0), desc: 'Shpenzim ' + (e.category || '') }); });
+  supPays.filter(x => (x.method || 'Para') !== 'Kredi' && (x.method || '') !== 'Vonë').forEach(x => { const dt = String(x.date || x.createdAt || '').slice(0, 10); events.push({ dt: dt, acc: '5000', d: Number(x.amount || 0), k: 0, desc: 'Pagesë furnitor ' + (x.mandate || '') }); events.push({ dt: dt, acc: '1000', d: 0, k: Number(x.amount || 0), desc: 'Mandat ' + (x.mandate || '') }); });
   events.sort((a, b) => a.dt.localeCompare(b.dt));
   return { revenue, vatOut, purchases, expenses, cashIn, receivables, inventory, cash, profit, events };
 }
@@ -12751,7 +12798,7 @@ function AlphaReportsView({ user, role }) {
   const [q, setQ] = useState('');
   const [moveType, setMoveType] = useState('');
   const [expCat, setExpCat] = useState('');
-  const { loading, data } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords()]), [from, to]);
+  const { loading, data } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords(), fbGetSupplierPayments()]), [from, to]);
   const pos = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
   const sales = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
   const products = useMemo(() => (data && data[2] && data[2].success ? data[2].data : []), [data]);
@@ -12760,10 +12807,11 @@ function AlphaReportsView({ user, role }) {
   const receipts = useMemo(() => (data && data[5] && data[5].success ? data[5].data : []), [data]);
   const suppliers = useMemo(() => (data && data[6] && data[6].success ? data[6].data : []), [data]);
   const customers = useMemo(() => (data && data[7] && data[7].success ? data[7].data : []), [data]);
+  const payments = useMemo(() => (data && data[8] && data[8].success ? data[8].data : []), [data]);
   const warehouses = useMemo(() => { const set = new Set(['Magazina Kryesore']); (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore')); return Array.from(set).sort(); }, [moves]);
   const expCats = useMemo(() => Array.from(new Set((expenses || []).map(e => e.category || '').filter(Boolean))).sort(), [expenses]);
   const fil = { from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat };
-  const built = useMemo(() => buildAlphaReport(sel, fil, { pos, sales, products, expenses, moves, receipts, suppliers, customers }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  const built = useMemo(() => buildAlphaReport(sel, fil, { pos, sales, products, expenses, moves, receipts, suppliers, customers, payments }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
   const onReportClick = (e) => {
     const b = e.target.closest('[data-alink]');
     if (!b) return;
@@ -12894,6 +12942,158 @@ function AlphaReportsView({ user, role }) {
   );
 }
 
+
+function TraceModal({ kind, id, onClose }) {
+  const { loading, data } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetWarehouseReceiptsIn(), fbGetStockMovements(), fbGetSales(), fbGetSupplierPayments()]), []);
+  const pos = data && data[0].success ? data[0].data : [];
+  const recs = data && data[1].success ? data[1].data : [];
+  const moves = data && data[2].success ? data[2].data : [];
+  const sales = data && data[3].success ? data[3].data : [];
+  const pays = data && data[4].success ? data[4].data : [];
+  const chain = [];
+  const add = (icon, label, nr, extra, open) => chain.push({ icon: icon, label: label, nr: nr, extra: extra, open: open });
+  if (!loading) {
+    if (kind === 'po') {
+      const po = pos.find(x => x.id === id);
+      if (po) {
+        add('fa-file-invoice-dollar', 'FATURË BLERJE', po.poNumber || '', (po.supplierName || '') + ' · Totali ' + money(po.total || 0), () => openPurchaseDocument(po, null, false));
+        recs.filter(r => r.poNumber === po.poNumber || r.poId === po.id).forEach(r => {
+          add('fa-box-open', 'FLETË HYRJE', warehouseDocNoFromReceipt(r), (r.warehouse || '') + ' · ' + money(r.total || 0), () => openWarehouseReceiptInDocument(r, false));
+          moves.filter(m => m.reference === r.id).forEach(m => add('fa-warehouse', 'MAGAZINË (' + (m.type === 'in' ? 'hyrje' : 'dalje') + ')', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        });
+        pays.filter(x => x.poId === po.id).forEach(x => add('fa-money-check-dollar', 'PAGESË / ARKËTIM (Mandat)', x.mandate || '', (x.method || '') + ' · ' + money(x.amount || 0), null));
+        const rem = round2(Number(po.total || 0) - Number(po.paidTotal || 0));
+        if (rem > 0) add('fa-hourglass-half', 'MBETET PËR T’U PAGUAR', money(rem), '', null);
+      }
+    } else if (kind === 'receipt') {
+      const r = recs.find(x => x.id === id);
+      if (r) {
+        const po = pos.find(x => x.poNumber === r.poNumber || x.id === r.poId);
+        if (po) add('fa-file-invoice-dollar', 'FATURË BLERJE (mbrapa)', po.poNumber || '', po.supplierName || '', () => openPurchaseDocument(po, null, false));
+        add('fa-box-open', 'FLETË HYRJE', warehouseDocNoFromReceipt(r), (r.warehouse || '') + ' · ' + money(r.total || 0), () => openWarehouseReceiptInDocument(r, false));
+        moves.filter(m => m.reference === r.id).forEach(m => add('fa-warehouse', 'MAGAZINË', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        pays.filter(x => (po && x.poId === po.id) || x.poNumber === r.poNumber).forEach(x => add('fa-money-check-dollar', 'PAGESË / ARKËTIM (Mandat)', x.mandate || '', (x.method || '') + ' · ' + money(x.amount || 0), null));
+      }
+    } else if (kind === 'sale') {
+      const sl = sales.find(x => x.id === id);
+      if (sl) {
+        add('fa-receipt', 'FATURË SHITJE', sl.invoiceNo || '', (sl.customerName || 'Walk-in') + ' · ' + money(sl.total || 0), () => openSaleDocument(sl, 'a4', false));
+        add('fa-warehouse', 'FLETË DALJE', 'FD-' + String(sl.invoiceNo || '').replace(/[^0-9A-Z]/gi, '').slice(-6), 'dalje nga magazina', null);
+        moves.filter(m => m.reference === sl.id).forEach(m => add('fa-warehouse', 'MAGAZINË', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        add('fa-money-check-dollar', 'ARKËTIM', sl.paymentMethod || 'Para', money(sl.total || 0), null);
+      }
+    }
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <div className="modal-header"><h3><i className="fas fa-diagram-project"></i> Gjurmueshmëria e dokumenteve</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+        <div className="modal-body">
+          {loading ? <TopLoadingBar /> : chain.map((n, i) => (
+            <div key={i}>
+              {i > 0 && <div style={{ textAlign: 'center', color: '#714B67', fontSize: 18, margin: '2px 0' }}><i className="fas fa-arrow-down"></i></div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', background: '#faf7fa' }}>
+                <i className={'fas ' + n.icon} style={{ color: '#714B67', width: 20 }}></i>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{n.label} <code>{n.nr}</code></div>
+                  <div style={{ color: '#808080', fontSize: 11 }}>{n.extra}</div>
+                </div>
+                {n.open && <button type="button" className="btn btn-preview" onClick={n.open}><i className="fas fa-arrow-pointer"></i> Hap</button>}
+              </div>
+            </div>
+          ))}
+          {!loading && chain.length === 0 && <div style={{ color: '#808080', padding: 12 }}>Nuk u gjetën dokumente të lidhura.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SupplierPaymentsView({ user, role }) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  const [supplierId, setSupplierId] = useState('');
+  const [poId, setPoId] = useState('');
+  const [method, setMethod] = useState('Para');
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const { loading, data } = useFetch(() => Promise.all([fbGetSupplierPayments(), fbGetSuppliers(), fbGetPurchaseOrders()]), [reloadKey]);
+  const pays = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
+  const suppliers = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
+  const pos = useMemo(() => (data && data[2] && data[2].success ? data[2].data : []), [data]);
+  const openPos = pos.filter(p => p.status === 'received' && (!supplierId || p.supplierId === supplierId) && Number(p.paidTotal || 0) < Number(p.total || 0));
+  const selPo = pos.find(p => p.id === poId);
+  const remaining = selPo ? round2(Number(selPo.total || 0) - Number(selPo.paidTotal || 0)) : 0;
+  const save = async () => {
+    if (!supplierId || !poId) { Swal.fire({ icon: 'warning', title: 'Zgjidh furnitorin dhe faturën' }); return; }
+    const r = await fbCreateSupplierPayment({ supplierId: supplierId, supplierName: (suppliers.find(x => x.id === supplierId) || {}).name || '', poId: poId, poNumber: selPo && selPo.poNumber || '', method: method, amount: Number(amount || remaining || 0), date: date, note: note }, user);
+    if (r.success) { setShowForm(false); setAmount(''); setNote(''); setPoId(''); Swal.fire({ icon: 'success', title: 'U ruajt!', text: r.message, timer: 1800, showConfirmButton: false }); setReloadKey(k => k + 1); }
+    else Swal.fire({ icon: 'error', title: 'Nuk u ruajt', text: r.message });
+  };
+  const onDocClick = (e) => {
+    const b = e.target.closest('[data-doc]');
+    if (!b) return;
+    const t = b.getAttribute('data-doc'); const idv = b.getAttribute('data-id');
+    if (t === 'po') { const po = pos.find(v => v.id === idv); if (po) openPurchaseDocument(po, suppliers.find(sp => sp.id === po.supplierId), false); }
+  };
+  if (loading) return <TopLoadingBar />;
+  return (
+    <div className="data-section" onClick={onDocClick}>
+      <div className="section-header">
+        <h2><i className="fas fa-money-check-dollar"></i> Pagesa furnitorësh</h2>
+        <button type="button" className="btn btn-success" onClick={() => setShowForm(true)}><i className="fas fa-plus"></i> Pagesë e re</button>
+      </div>
+      <div style={{ background: '#fff', borderRadius: 8, padding: 10, overflow: 'auto' }}>
+        <table className="report-table">
+          <thead><tr><th>Data</th><th>Mandati</th><th>Furnitori</th><th>Fatura e blerjes</th><th>Mënyra</th><th>Shuma</th><th>Shënim</th></tr></thead>
+          <tbody>{pays.length ? pays.map(x => (
+            <tr key={x.id}>
+              <td>{reportDateOnly(x.date || x.createdAt)}</td>
+              <td><b>{x.mandate}</b></td>
+              <td>{x.supplierName}</td>
+              <td>{x.poId ? <button type="button" className="doc-link" data-doc="po" data-id={x.poId}><i className="fas fa-arrow-right"></i>{x.poNumber}</button> : (x.poNumber || '-')}</td>
+              <td>{x.method}</td>
+              <td>{money(x.amount || 0)}</td>
+              <td>{x.note || ''}</td>
+            </tr>
+          )) : <tr><td colSpan="7" style={{ textAlign: 'center', color: '#888', padding: 18 }}>Nuk ka pagesa të regjistruara.</td></tr>}</tbody>
+        </table>
+      </div>
+      {showForm && (
+        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header"><h3><i className="fas fa-money-check-dollar"></i> Pagesë e re furnitori</h3><button className="close-btn" onClick={() => setShowForm(false)}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <div className="form-group"><label>Furnitori</label>
+                <select value={supplierId} onChange={e => { setSupplierId(e.target.value); setPoId(''); }} style={{ width: '100%', padding: 8 }}>
+                  <option value="">— zgjidh —</option>
+                  {suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              </div>
+              <div className="form-group"><label>Fatura e blerjes (e papaguar)</label>
+                <select value={poId} onChange={e => setPoId(e.target.value)} style={{ width: '100%', padding: 8 }}>
+                  <option value="">— zgjidh —</option>
+                  {openPos.map(x => <option key={x.id} value={x.id}>{x.poNumber} · {money(x.total || 0)} · mbetur {money(round2(Number(x.total || 0) - Number(x.paidTotal || 0)))}</option>)}
+                </select>
+              </div>
+              <div className="form-group"><label>Mënyra e pagesës</label>
+                <select value={method} onChange={e => setMethod(e.target.value)} style={{ width: '100%', padding: 8 }}>
+                  <option value="Para">Para (cash)</option><option value="Bankë">Bankë</option><option value="Kredi">Kredi</option><option value="Vonë">Vonë</option>
+                </select>
+              </div>
+              <div className="form-group"><label>Shuma (mbetur: {money(remaining)})</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder={String(remaining)} style={{ width: '100%', padding: 8 }} /></div>
+              <div className="form-group"><label>Data</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: '100%', padding: 8 }} /></div>
+              <div className="form-group"><label>Shënim</label><input value={note} onChange={e => setNote(e.target.value)} style={{ width: '100%', padding: 8 }} /></div>
+              <div className="form-actions"><button type="button" className="btn btn-primary" onClick={save}><i className="fas fa-floppy-disk"></i> Ruaj pagesën</button><button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Anulo</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MainContent({ activeMenu, user, role, setActiveMenu }) {
   if (!canAccessMenu(role, activeMenu) && activeMenu !== 'about') {
     return (
@@ -12917,6 +13117,7 @@ function MainContent({ activeMenu, user, role, setActiveMenu }) {
     case 'records': return <RecordsView user={user} role={role} setActiveMenu={setActiveMenu} />;
     case 'suppliers': return <SuppliersView user={user} role={role} setActiveMenu={setActiveMenu} />;
     case 'purchase-orders': return <PurchaseOrdersView user={user} role={role} setActiveMenu={setActiveMenu} />;
+    case 'supplier-payments': return <SupplierPaymentsView user={user} role={role} />;
     case 'warehouse-receipts-in': return <WarehouseReceiptsInView user={user} role={role} />;
     case 'expenses': return <ExpensesView user={user} role={role} setActiveMenu={setActiveMenu} />;
     case 'users': return <UsersView user={user} role={role} />;
@@ -12953,7 +13154,7 @@ function Dashboard({ user, role, onLogout }) {
     reports: 'Raportet', 
     records: 'Klientët', 
     suppliers: 'Furnitorët', 
-    'purchase-orders': 'Porosi Blerje', 
+    'purchase-orders': 'Porosi Blerje', 'supplier-payments': 'Pagesa furnitorësh', 
     'warehouse-receipts-in': 'Fletë Hyrje',
     expenses: 'Shpenzimet', 
     users: 'Përdoruesit', 

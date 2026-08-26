@@ -259,6 +259,7 @@ const ROLE_RIGHTS = {
     records: true,
     suppliers: true,
     'purchase-orders': true,
+    'supplier-payments': true,
     'warehouse-receipts-in': true,
     expenses: true,
     users: false,
@@ -303,6 +304,7 @@ const ROLE_RIGHTS = {
     records: false,
     suppliers: true,
     'purchase-orders': true,
+    'supplier-payments': true,
     'warehouse-receipts-in': true,
     expenses: false,
     users: false,
@@ -349,6 +351,7 @@ const RIGHT_LABELS = {
   records: 'Klientët',
   suppliers: 'Furnitorët',
   'purchase-orders': 'Porosi blerje',
+  'supplier-payments': 'Pagesa furnitorësh',
   'warehouse-receipts-in': 'Fletë Hyrje',
   expenses: 'Shpenzimet',
   users: 'Përdoruesit',
@@ -613,6 +616,69 @@ function buildFatureHtml(d) {
     return '<tr><td class="rate">' + escL(f2(r.rate)) + '</td><td>' + escL(f2(r.base)) + '</td><td>' + escL(f2(r.vat)) + '</td></tr>';
   }).join('');
   return FATURE_A4_CSS + '<div class="sheet doc-a4">' + '<h1>FATURË</h1>' + '<div class="box">' + '<div class="r"><div><b>Shitësi:</b></div><div>' + escL(d.seller.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.seller.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit :</b></div><div>' + escL(d.seller.nipt || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div>Data dhe ora e lëshimit të faturës:</div><div>' + escL(fatureDateFmt(d.issueIso)) + '</div></div>' + '<div class="r"><div>Numri i Faturës:</div><div>' + escL(d.invoiceNo || '') + '</div></div>' + '<div class="r"><div>Operatori:</div><div>' + escL(d.operator || '') + '</div></div>' + '<div class="r"><div>Kodin e vendit të ushtrimit të veprimtarisë:</div><div>' + escL(d.unitCode || '') + '</div></div>' + '<div class="r"><div>Lloji i Faturës:</div><div>' + escL(d.typeLabel || '') + '</div></div></div>' + '<div class="box">' + '<div class="r"><div><b>Blerësi:</b></div><div>' + escL(d.buyer.name || '') + '</div></div>' + '<div class="r"><div><b>Adresa:</b></div><div>' + escL(d.buyer.address || '') + '</div></div>' + '<div class="r"><div><b>Numri Unik i Identifikimit:</b></div><div>' + escL(d.buyer.nipt || '') + '</div></div></div>' + '<table><thead><tr><th>Përshkrimi i Mallit ose Shërbimit</th><th>Njësia e Matjes</th><th>Sasia</th><th>Cmimi për njësi pa tvsh</th><th>Zbritje %</th><th>Norma e TVSH</th><th>Vlera pa TVSH (sasi x çmimi)</th><th>TVSH (Vlera)</th><th>Vlera Totale</th></tr></thead><tbody>' + rows + totRow('Vlera pa TVSH', d.subtotal, false) + totRow('Vlera totale e TVSH-së', d.vatTotal, false) + totRow('Totali per tu paguar (LEK)', d.grandTotal, true) + '</tbody></table>' + '<p class="vathead">Shpërndarja e TVSH-së</p>' + '<table class="vat"><thead><tr><th>Norma e TVSH-se</th><th>Baza e tatueshme (LEK)</th><th>Vlera e TVSH-se(LEK)</th></tr></thead><tbody>' + vat + '</tbody></table>' + '<p class="fl">Data dhe ora e kryerjes së pagesës:<span>' + escL(payDateFmt(d.payIso)) + '</span></p>' + '<p class="fl">Numri i sigurisë së lëshuesit të faturës (NSLF):<span>' + escL(d.nslf || '') + '</span></p>' + '<p class="fl">Numri identifikues të veçantë të faturës (NIVF):<span>' + escL(d.nivf || '') + '</span></p>' + '</div>';
+}
+async function fbGetSupplierPayments() {
+  try {
+    const snap = await db.ref('supplier_payments').once('value');
+    const val = snap.val() || {};
+    const arr = Object.entries(val).map(function (e) {
+      return Object.assign({
+        id: e[0]
+      }, e[1]);
+    });
+    arr.sort(function (a, b) {
+      return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
+    });
+    return {
+      success: true,
+      data: arr
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: e.message,
+      data: []
+    };
+  }
+}
+async function fbCreateSupplierPayment(pay, user) {
+  try {
+    const id = 'sp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const mandate = 'MP-' + String(Date.now()).slice(-6);
+    const rec = Object.assign({}, pay, {
+      id: id,
+      mandate: mandate,
+      createdBy: user && (user.name || user.email) || '',
+      createdAt: new Date().toISOString()
+    });
+    await db.ref('supplier_payments/' + id).set(rec);
+    if (pay.poId) {
+      const snap = await db.ref('purchase_orders/' + pay.poId).once('value');
+      const po = snap.val() || {};
+      const paid = round2(Number(po.paidTotal || 0) + Number(pay.amount || 0));
+      await db.ref('purchase_orders/' + pay.poId).update({
+        paidTotal: paid,
+        payStatus: paid >= Number(po.total || 0) ? 'paid' : 'partial'
+      });
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('erp-data-changed', {
+        detail: {
+          tableId: 'payTable'
+        }
+      }));
+    } catch (e) {}
+    return {
+      success: true,
+      data: rec,
+      message: 'Pagesa u ruajt — Mandati ' + mandate
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: e.message
+    };
+  }
 }
 function alphaCss() {
   return '<style>' + '.alpha-wrap{background:#fff;padding:18px 22px;font-family:Calibri,Arial,sans-serif;color:#008000;max-width:1160px;margin:0 auto}' + '.alpha-title{font-family:Calibri,Arial,sans-serif;font-weight:700;color:#008000;font-size:30px;text-align:center;margin:6px 0 14px}' + '.alpha-filters{font-family:"Times New Roman",serif;color:#808080;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 28px;margin:0 0 10px}' + '.alpha-table{border-collapse:collapse;width:100%}' + '.alpha-table th,.alpha-table td{border:1px solid #808080;color:#008000;font-size:10.5px;padding:3px 6px;text-align:center}' + '.alpha-table th{background:#F0FFF0;font-weight:700}' + '.alpha-table td.l,.alpha-table th.l{text-align:left}' + '.alpha-table td.r{text-align:right}' + '.alpha-total td{border-top:2px solid #000;font-weight:700}' + '.alpha-foot{display:flex;justify-content:space-between;margin-top:26px;font-size:10px}' + '.alpha-foot .fl{font-style:italic;color:#008000}.alpha-foot .pg{color:#008000}' + '</style>';
@@ -1128,6 +1194,14 @@ function buildAlphaReport(id, fil, D) {
       pershkrimi: 'Shpenzim: ' + (e.category || '') + (e.note ? ' — ' + e.note : ''),
       hyrje: 0,
       dalje: Number(e.amount || 0)
+    }));
+    (D.payments || []).filter(x => alphaInPeriod(x.date || x.createdAt, fil)).forEach(x => ev.push({
+      dt: String(x.date || x.createdAt || '').slice(0, 10),
+      pershkrimi: 'Mandat ' + (x.mandate || '') + ' — ' + (x.supplierName || ''),
+      hyrje: 0,
+      dalje: Number(x.amount || 0),
+      _link: x.poId ? 'po' : '',
+      _id: x.poId || ''
     }));
     ev.sort((a, b) => a.dt.localeCompare(b.dt));
     let bal = 0;
@@ -4534,6 +4608,10 @@ function Sidebar({
     id: "purchase-orders",
     icon: "fa-bag-shopping",
     label: "Porosi blerje"
+  }), React.createElement(Item, {
+    id: "supplier-payments",
+    icon: "fa-money-check-dollar",
+    label: "Pagesa furnitor\xEBsh"
   }), React.createElement(Item, {
     id: "warehouse-receipts-in",
     icon: "fa-box-open",
@@ -8073,6 +8151,7 @@ function WarehouseReceiptInOverlay({
   receipt,
   onClose
 }) {
+  const [trace, setTrace] = useState(false);
   if (!receipt) return null;
   return React.createElement("div", {
     className: "modal-overlay",
@@ -8124,7 +8203,17 @@ function WarehouseReceiptInOverlay({
     onClick: () => exportWarehouseInXlsx(receipt)
   }, React.createElement("i", {
     className: "fas fa-file-excel"
-  }), " Excel")), React.createElement("div", {
+  }), " Excel"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-preview",
+    onClick: () => setTrace(true)
+  }, React.createElement("i", {
+    className: "fas fa-diagram-project"
+  }), " Gjurmueshm\xEBria"), trace && React.createElement(TraceModal, {
+    kind: "receipt",
+    id: receipt.id,
+    onClose: () => setTrace(false)
+  })), React.createElement("div", {
     style: {
       background: '#f5f5f5',
       padding: 12,
@@ -8159,6 +8248,7 @@ function ThermalReceiptOverlay({
   onClose
 }) {
   const [docMode, setDocMode] = useState('thermal');
+  const [trace, setTrace] = useState(false);
   useEffect(() => {
     setLastDocSale(sale);
   }, [sale]);
@@ -8190,6 +8280,16 @@ function ThermalReceiptOverlay({
       marginBottom: 10
     }
   }, React.createElement("button", {
+    type: "button",
+    className: "btn btn-preview",
+    onClick: () => setTrace(true)
+  }, React.createElement("i", {
+    className: "fas fa-diagram-project"
+  }), " Gjurmueshm\xEBria"), trace && React.createElement(TraceModal, {
+    kind: "sale",
+    id: sale.id,
+    onClose: () => setTrace(false)
+  }), React.createElement("button", {
     type: "button",
     className: 'btn ' + (docMode === 'thermal' ? 'btn-primary' : 'btn-secondary'),
     onClick: () => setDocMode('thermal')
@@ -10234,7 +10334,7 @@ function ReportsView({
     loading,
     data,
     err
-  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn()]), []);
+  } = useFetch(() => Promise.all([fbGetSales(), fbGetProducts(), fbGetStockMovements(), fbGetPurchaseOrders(), fbGetExpenses(), fbGetCustomers(), fbGetSuppliers(), fbGetReturns(), fbGetWarehouseReceiptsIn(), fbGetSupplierPayments()]), []);
   const sales = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
   const products = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
   const moves = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);
@@ -10244,6 +10344,7 @@ function ReportsView({
   const suppliers = useMemo(() => data && data[6] && data[6].success ? data[6].data : [], [data]);
   const returns = useMemo(() => data && data[7] && data[7].success ? data[7].data : [], [data]);
   const receipts = useMemo(() => data && data[8] && data[8].success ? data[8].data : [], [data]);
+  const supPays = useMemo(() => data && data[9] && data[9].success ? data[9].data : [], [data]);
   const productById = useMemo(() => products.reduce((m, p) => (m[p.id] = p, m), {}), [products]);
   const customerById = useMemo(() => customers.reduce((m, c) => (m[c.id] = c, m), {}), [customers]);
   const supplierById = useMemo(() => suppliers.reduce((m, s) => (m[s.id] = s, m), {}), [suppliers]);
@@ -10533,7 +10634,8 @@ function ReportsView({
     unitSummary: (p.items || []).map(it => (it.enteredQty != null ? it.enteredQty : it.qty) + ' ' + (it.unitName || 'copë')).join(', '),
     total: Number(p.total) || 0,
     status: p.status || '-',
-    poId: p.id
+    poId: p.id,
+    payStatus: Number(p.total || 0) > 0 ? Number(p.paidTotal || 0) >= Number(p.total || 0) ? 'E paguar' : Number(p.paidTotal || 0) > 0 ? 'Pjesërisht' : 'E papaguar' : '-'
   }));
   const purchaseTotal = purchaseLines.reduce((a, r) => a + Number(r.lineTotal || 0), 0);
   const purchaseItemRows = reportGroup(purchaseLines, l => (l.productId || l.productName || 'unknown') + '|' + (l.unitKey || 'base'), l => ({
@@ -10776,6 +10878,19 @@ function ReportsView({
           poId: p.id
         });
       });
+      supPays.filter(x => x.supplierId === sup.id || x.supplierName === sup.name).sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt)).forEach(x => {
+        bal -= Number(x.amount || 0);
+        rows.push({
+          date: x.date || x.createdAt,
+          supplier: sup.name,
+          type: 'Pagesë (mandat)',
+          doc: (x.mandate || '') + (x.poNumber ? ' / ' + x.poNumber : ''),
+          debit: 0,
+          credit: Number(x.amount || 0),
+          balance: bal,
+          poId: x.poId
+        });
+      });
       expenseRows.filter(e => e.vendor === sup.name).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(e => {
         bal -= Number(e.amount || 0);
         rows.push({
@@ -10820,6 +10935,16 @@ function ReportsView({
     invoice: 0,
     payment: Number(e.amount || 0),
     balance: -Number(e.amount || 0)
+  })), supPays.map(x => ({
+    date: x.date || x.createdAt,
+    party: x.supplierName || '-',
+    kind: 'Furnitor',
+    type: 'Pagesë (mandat)',
+    doc: x.mandate || '-',
+    invoice: 0,
+    payment: Number(x.amount || 0),
+    balance: -Number(x.amount || 0),
+    poId: x.poId
   }))).filter(r => {
     if (filters.customerId) {
       const c = customerById[filters.customerId];
@@ -12265,6 +12390,10 @@ function ReportsView({
       key: 'status',
       label: 'Statusi',
       value: r => r.status
+    }, {
+      key: 'payStatus',
+      label: 'Pagesa',
+      value: r => r.payStatus
     }, {
       key: 'total',
       label: 'Totali',
@@ -13783,6 +13912,7 @@ function PoDetailModal({
   onReceive,
   supplier
 }) {
+  const [trace, setTrace] = useState(false);
   if (!po) return null;
   const receivable = po.status !== 'received' && po.status !== 'cancelled';
   const stages = [{
@@ -13834,6 +13964,16 @@ function PoDetailModal({
     }, React.createElement("i", {
       className: "fas fa-file-excel"
     }), " Excel"), React.createElement("button", {
+      type: "button",
+      className: "btn btn-preview",
+      onClick: () => setTrace(true)
+    }, React.createElement("i", {
+      className: "fas fa-diagram-project"
+    }), " Gjurmueshm\xEBria"), trace && React.createElement(TraceModal, {
+      kind: "po",
+      id: po.id,
+      onClose: () => setTrace(false)
+    }), React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       onClick: onClose
@@ -17004,7 +17144,9 @@ function alphaFin(D, fil) {
   const cashIn = round2(sales.filter(x => x.paymentMethod !== 'Credit').reduce((a, x) => a + Number(x.total || 0), 0));
   const receivables = round2(sales.filter(x => x.paymentMethod === 'Credit').reduce((a, x) => a + Number(x.total || 0), 0));
   const inventory = alphaStockValue(D);
-  const cash = round2(cashIn - purchases - expenses);
+  const supPays = (D.payments || []).filter(x => alphaInPeriod(x.date || x.createdAt, fil));
+  const paidOut = round2(supPays.filter(x => (x.method || 'Para') !== 'Kredi' && (x.method || '') !== 'Vonë').reduce((a, x) => a + Number(x.amount || 0), 0));
+  const cash = round2(cashIn - paidOut - expenses);
   const profit = round2(revenue - purchases - expenses);
   const events = [];
   sales.forEach(x => {
@@ -17062,6 +17204,23 @@ function alphaFin(D, fil) {
       d: 0,
       k: Number(e.amount || 0),
       desc: 'Shpenzim ' + (e.category || '')
+    });
+  });
+  supPays.filter(x => (x.method || 'Para') !== 'Kredi' && (x.method || '') !== 'Vonë').forEach(x => {
+    const dt = String(x.date || x.createdAt || '').slice(0, 10);
+    events.push({
+      dt: dt,
+      acc: '5000',
+      d: Number(x.amount || 0),
+      k: 0,
+      desc: 'Pagesë furnitor ' + (x.mandate || '')
+    });
+    events.push({
+      dt: dt,
+      acc: '1000',
+      d: 0,
+      k: Number(x.amount || 0),
+      desc: 'Mandat ' + (x.mandate || '')
     });
   });
   events.sort((a, b) => a.dt.localeCompare(b.dt));
@@ -19078,7 +19237,7 @@ function AlphaReportsView({
   const {
     loading,
     data
-  } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords()]), [from, to]);
+  } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords(), fbGetSupplierPayments()]), [from, to]);
   const pos = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
   const sales = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
   const products = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);
@@ -19087,6 +19246,7 @@ function AlphaReportsView({
   const receipts = useMemo(() => data && data[5] && data[5].success ? data[5].data : [], [data]);
   const suppliers = useMemo(() => data && data[6] && data[6].success ? data[6].data : [], [data]);
   const customers = useMemo(() => data && data[7] && data[7].success ? data[7].data : [], [data]);
+  const payments = useMemo(() => data && data[8] && data[8].success ? data[8].data : [], [data]);
   const warehouses = useMemo(() => {
     const set = new Set(['Magazina Kryesore']);
     (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore'));
@@ -19113,7 +19273,8 @@ function AlphaReportsView({
     moves,
     receipts,
     suppliers,
-    customers
+    customers,
+    payments
   }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
   const onReportClick = e => {
     const b = e.target.closest('[data-alink]');
@@ -19414,6 +19575,354 @@ function AlphaReportsView({
     }
   })));
 }
+function TraceModal({
+  kind,
+  id,
+  onClose
+}) {
+  const {
+    loading,
+    data
+  } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetWarehouseReceiptsIn(), fbGetStockMovements(), fbGetSales(), fbGetSupplierPayments()]), []);
+  const pos = data && data[0].success ? data[0].data : [];
+  const recs = data && data[1].success ? data[1].data : [];
+  const moves = data && data[2].success ? data[2].data : [];
+  const sales = data && data[3].success ? data[3].data : [];
+  const pays = data && data[4].success ? data[4].data : [];
+  const chain = [];
+  const add = (icon, label, nr, extra, open) => chain.push({
+    icon: icon,
+    label: label,
+    nr: nr,
+    extra: extra,
+    open: open
+  });
+  if (!loading) {
+    if (kind === 'po') {
+      const po = pos.find(x => x.id === id);
+      if (po) {
+        add('fa-file-invoice-dollar', 'FATURË BLERJE', po.poNumber || '', (po.supplierName || '') + ' · Totali ' + money(po.total || 0), () => openPurchaseDocument(po, null, false));
+        recs.filter(r => r.poNumber === po.poNumber || r.poId === po.id).forEach(r => {
+          add('fa-box-open', 'FLETË HYRJE', warehouseDocNoFromReceipt(r), (r.warehouse || '') + ' · ' + money(r.total || 0), () => openWarehouseReceiptInDocument(r, false));
+          moves.filter(m => m.reference === r.id).forEach(m => add('fa-warehouse', 'MAGAZINË (' + (m.type === 'in' ? 'hyrje' : 'dalje') + ')', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        });
+        pays.filter(x => x.poId === po.id).forEach(x => add('fa-money-check-dollar', 'PAGESË / ARKËTIM (Mandat)', x.mandate || '', (x.method || '') + ' · ' + money(x.amount || 0), null));
+        const rem = round2(Number(po.total || 0) - Number(po.paidTotal || 0));
+        if (rem > 0) add('fa-hourglass-half', 'MBETET PËR T’U PAGUAR', money(rem), '', null);
+      }
+    } else if (kind === 'receipt') {
+      const r = recs.find(x => x.id === id);
+      if (r) {
+        const po = pos.find(x => x.poNumber === r.poNumber || x.id === r.poId);
+        if (po) add('fa-file-invoice-dollar', 'FATURË BLERJE (mbrapa)', po.poNumber || '', po.supplierName || '', () => openPurchaseDocument(po, null, false));
+        add('fa-box-open', 'FLETË HYRJE', warehouseDocNoFromReceipt(r), (r.warehouse || '') + ' · ' + money(r.total || 0), () => openWarehouseReceiptInDocument(r, false));
+        moves.filter(m => m.reference === r.id).forEach(m => add('fa-warehouse', 'MAGAZINË', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        pays.filter(x => po && x.poId === po.id || x.poNumber === r.poNumber).forEach(x => add('fa-money-check-dollar', 'PAGESË / ARKËTIM (Mandat)', x.mandate || '', (x.method || '') + ' · ' + money(x.amount || 0), null));
+      }
+    } else if (kind === 'sale') {
+      const sl = sales.find(x => x.id === id);
+      if (sl) {
+        add('fa-receipt', 'FATURË SHITJE', sl.invoiceNo || '', (sl.customerName || 'Walk-in') + ' · ' + money(sl.total || 0), () => openSaleDocument(sl, 'a4', false));
+        add('fa-warehouse', 'FLETË DALJE', 'FD-' + String(sl.invoiceNo || '').replace(/[^0-9A-Z]/gi, '').slice(-6), 'dalje nga magazina', null);
+        moves.filter(m => m.reference === sl.id).forEach(m => add('fa-warehouse', 'MAGAZINË', m.productName || m.productId || '', (m.warehouse || '') + ' · sasia ' + (m.qty || 0), () => openMovementDocument(m, null, false)));
+        add('fa-money-check-dollar', 'ARKËTIM', sl.paymentMethod || 'Para', money(sl.total || 0), null);
+      }
+    }
+  }
+  return React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose
+  }, React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: 640
+    }
+  }, React.createElement("div", {
+    className: "modal-header"
+  }, React.createElement("h3", null, React.createElement("i", {
+    className: "fas fa-diagram-project"
+  }), " Gjurmueshm\xEBria e dokumenteve"), React.createElement("button", {
+    className: "close-btn",
+    onClick: onClose
+  }, React.createElement("i", {
+    className: "fas fa-times"
+  }))), React.createElement("div", {
+    className: "modal-body"
+  }, loading ? React.createElement(TopLoadingBar, null) : chain.map((n, i) => React.createElement("div", {
+    key: i
+  }, i > 0 && React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      color: '#714B67',
+      fontSize: 18,
+      margin: '2px 0'
+    }
+  }, React.createElement("i", {
+    className: "fas fa-arrow-down"
+  })), React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      border: '1px solid #ddd',
+      borderRadius: 6,
+      padding: '8px 10px',
+      background: '#faf7fa'
+    }
+  }, React.createElement("i", {
+    className: 'fas ' + n.icon,
+    style: {
+      color: '#714B67',
+      width: 20
+    }
+  }), React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13
+    }
+  }, n.label, " ", React.createElement("code", null, n.nr)), React.createElement("div", {
+    style: {
+      color: '#808080',
+      fontSize: 11
+    }
+  }, n.extra)), n.open && React.createElement("button", {
+    type: "button",
+    className: "btn btn-preview",
+    onClick: n.open
+  }, React.createElement("i", {
+    className: "fas fa-arrow-pointer"
+  }), " Hap")))), !loading && chain.length === 0 && React.createElement("div", {
+    style: {
+      color: '#808080',
+      padding: 12
+    }
+  }, "Nuk u gjet\xEBn dokumente t\xEB lidhura."))));
+}
+function SupplierPaymentsView({
+  user,
+  role
+}) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  const [supplierId, setSupplierId] = useState('');
+  const [poId, setPoId] = useState('');
+  const [method, setMethod] = useState('Para');
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const {
+    loading,
+    data
+  } = useFetch(() => Promise.all([fbGetSupplierPayments(), fbGetSuppliers(), fbGetPurchaseOrders()]), [reloadKey]);
+  const pays = useMemo(() => data && data[0] && data[0].success ? data[0].data : [], [data]);
+  const suppliers = useMemo(() => data && data[1] && data[1].success ? data[1].data : [], [data]);
+  const pos = useMemo(() => data && data[2] && data[2].success ? data[2].data : [], [data]);
+  const openPos = pos.filter(p => p.status === 'received' && (!supplierId || p.supplierId === supplierId) && Number(p.paidTotal || 0) < Number(p.total || 0));
+  const selPo = pos.find(p => p.id === poId);
+  const remaining = selPo ? round2(Number(selPo.total || 0) - Number(selPo.paidTotal || 0)) : 0;
+  const save = async () => {
+    if (!supplierId || !poId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Zgjidh furnitorin dhe faturën'
+      });
+      return;
+    }
+    const r = await fbCreateSupplierPayment({
+      supplierId: supplierId,
+      supplierName: (suppliers.find(x => x.id === supplierId) || {}).name || '',
+      poId: poId,
+      poNumber: selPo && selPo.poNumber || '',
+      method: method,
+      amount: Number(amount || remaining || 0),
+      date: date,
+      note: note
+    }, user);
+    if (r.success) {
+      setShowForm(false);
+      setAmount('');
+      setNote('');
+      setPoId('');
+      Swal.fire({
+        icon: 'success',
+        title: 'U ruajt!',
+        text: r.message,
+        timer: 1800,
+        showConfirmButton: false
+      });
+      setReloadKey(k => k + 1);
+    } else Swal.fire({
+      icon: 'error',
+      title: 'Nuk u ruajt',
+      text: r.message
+    });
+  };
+  const onDocClick = e => {
+    const b = e.target.closest('[data-doc]');
+    if (!b) return;
+    const t = b.getAttribute('data-doc');
+    const idv = b.getAttribute('data-id');
+    if (t === 'po') {
+      const po = pos.find(v => v.id === idv);
+      if (po) openPurchaseDocument(po, suppliers.find(sp => sp.id === po.supplierId), false);
+    }
+  };
+  if (loading) return React.createElement(TopLoadingBar, null);
+  return React.createElement("div", {
+    className: "data-section",
+    onClick: onDocClick
+  }, React.createElement("div", {
+    className: "section-header"
+  }, React.createElement("h2", null, React.createElement("i", {
+    className: "fas fa-money-check-dollar"
+  }), " Pagesa furnitor\xEBsh"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-success",
+    onClick: () => setShowForm(true)
+  }, React.createElement("i", {
+    className: "fas fa-plus"
+  }), " Pages\xEB e re")), React.createElement("div", {
+    style: {
+      background: '#fff',
+      borderRadius: 8,
+      padding: 10,
+      overflow: 'auto'
+    }
+  }, React.createElement("table", {
+    className: "report-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Data"), React.createElement("th", null, "Mandati"), React.createElement("th", null, "Furnitori"), React.createElement("th", null, "Fatura e blerjes"), React.createElement("th", null, "M\xEBnyra"), React.createElement("th", null, "Shuma"), React.createElement("th", null, "Sh\xEBnim"))), React.createElement("tbody", null, pays.length ? pays.map(x => React.createElement("tr", {
+    key: x.id
+  }, React.createElement("td", null, reportDateOnly(x.date || x.createdAt)), React.createElement("td", null, React.createElement("b", null, x.mandate)), React.createElement("td", null, x.supplierName), React.createElement("td", null, x.poId ? React.createElement("button", {
+    type: "button",
+    className: "doc-link",
+    "data-doc": "po",
+    "data-id": x.poId
+  }, React.createElement("i", {
+    className: "fas fa-arrow-right"
+  }), x.poNumber) : x.poNumber || '-'), React.createElement("td", null, x.method), React.createElement("td", null, money(x.amount || 0)), React.createElement("td", null, x.note || ''))) : React.createElement("tr", null, React.createElement("td", {
+    colSpan: "7",
+    style: {
+      textAlign: 'center',
+      color: '#888',
+      padding: 18
+    }
+  }, "Nuk ka pagesa t\xEB regjistruara."))))), showForm && React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => setShowForm(false)
+  }, React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: 560
+    }
+  }, React.createElement("div", {
+    className: "modal-header"
+  }, React.createElement("h3", null, React.createElement("i", {
+    className: "fas fa-money-check-dollar"
+  }), " Pages\xEB e re furnitori"), React.createElement("button", {
+    className: "close-btn",
+    onClick: () => setShowForm(false)
+  }, React.createElement("i", {
+    className: "fas fa-times"
+  }))), React.createElement("div", {
+    className: "modal-body"
+  }, React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "Furnitori"), React.createElement("select", {
+    value: supplierId,
+    onChange: e => {
+      setSupplierId(e.target.value);
+      setPoId('');
+    },
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  }, React.createElement("option", {
+    value: ""
+  }, "\u2014 zgjidh \u2014"), suppliers.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.name)))), React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "Fatura e blerjes (e papaguar)"), React.createElement("select", {
+    value: poId,
+    onChange: e => setPoId(e.target.value),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  }, React.createElement("option", {
+    value: ""
+  }, "\u2014 zgjidh \u2014"), openPos.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.poNumber, " \xB7 ", money(x.total || 0), " \xB7 mbetur ", money(round2(Number(x.total || 0) - Number(x.paidTotal || 0))))))), React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "M\xEBnyra e pages\xEBs"), React.createElement("select", {
+    value: method,
+    onChange: e => setMethod(e.target.value),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  }, React.createElement("option", {
+    value: "Para"
+  }, "Para (cash)"), React.createElement("option", {
+    value: "Bank\xEB"
+  }, "Bank\xEB"), React.createElement("option", {
+    value: "Kredi"
+  }, "Kredi"), React.createElement("option", {
+    value: "Von\xEB"
+  }, "Von\xEB"))), React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "Shuma (mbetur: ", money(remaining), ")"), React.createElement("input", {
+    type: "number",
+    value: amount,
+    onChange: e => setAmount(e.target.value),
+    placeholder: String(remaining),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  })), React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "Data"), React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  })), React.createElement("div", {
+    className: "form-group"
+  }, React.createElement("label", null, "Sh\xEBnim"), React.createElement("input", {
+    value: note,
+    onChange: e => setNote(e.target.value),
+    style: {
+      width: '100%',
+      padding: 8
+    }
+  })), React.createElement("div", {
+    className: "form-actions"
+  }, React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: save
+  }, React.createElement("i", {
+    className: "fas fa-floppy-disk"
+  }), " Ruaj pages\xEBn"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: () => setShowForm(false)
+  }, "Anulo"))))));
+}
 function MainContent({
   activeMenu,
   user,
@@ -19506,6 +20015,11 @@ function MainContent({
         role: role,
         setActiveMenu: setActiveMenu
       });
+    case 'supplier-payments':
+      return React.createElement(SupplierPaymentsView, {
+        user: user,
+        role: role
+      });
     case 'warehouse-receipts-in':
       return React.createElement(WarehouseReceiptsInView, {
         user: user,
@@ -19579,6 +20093,7 @@ function Dashboard({
     records: 'Klientët',
     suppliers: 'Furnitorët',
     'purchase-orders': 'Porosi Blerje',
+    'supplier-payments': 'Pagesa furnitorësh',
     'warehouse-receipts-in': 'Fletë Hyrje',
     expenses: 'Shpenzimet',
     users: 'Përdoruesit',
