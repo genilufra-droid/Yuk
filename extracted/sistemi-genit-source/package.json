@@ -1,6 +1,6 @@
 {
   "name": "sistemi-genit",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Sistemi Genit - ERP/POS desktop application (Electron + SQLite)",
   "author": "Mariglen Myftari",
   "license": "MIT",

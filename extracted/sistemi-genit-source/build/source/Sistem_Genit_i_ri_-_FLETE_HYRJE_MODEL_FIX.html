@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.2.1'
+      initializedVersion: '1.2.2'
     };
 
     try {
@@ -4912,7 +4912,10 @@ function alphaReportHtml(spec, rows, totals) {
       spec.columns.map(c => '<th class="' + (c.num ? 'r' : (c.align || '')) + '">' + alphaEsc(c.label) + '</th>').join('') + '</tr>';
   }
   const body = (rows || []).map(r => '<tr>' + lead.map(c => '<td class="l">' + alphaEsc(r[c.key]) + '</td>').join('') +
-    spec.columns.map(c => '<td class="' + (c.num ? 'r' : (c.align || '')) + '">' + (c.num ? alphaF2(r[c.key]) : alphaEsc(r[c.key])) + '</td>').join('') + '</tr>').join('');
+    spec.columns.map(c => {
+      if (c.link) { const lt = c.link === 'row' ? (r._link || '') : c.link; const lid = c.link === 'row' ? (r._id || '') : (r[c.linkId || 'id'] || ''); return '<td class="l"><button type="button" class="doc-link" data-alink="' + alphaEsc(lt) + '" data-id="' + alphaEsc(lid) + '"><i class="fas fa-arrow-right"></i>' + alphaEsc(r[c.key]) + '</button></td>'; }
+      return '<td class="' + (c.num ? 'r' : (c.align || '')) + '">' + (c.num ? alphaF2(r[c.key]) : alphaEsc(r[c.key])) + '</td>';
+    }).join('') + '</tr>').join('');
   let totRow = '';
   if (totals) {
     totRow = '<tr class="alpha-total"><td class="l" colspan="' + (lead.length + 1) + '">Total:</td>' +
@@ -4940,6 +4943,8 @@ function buildAlphaReport(id, fil, D) {
   if (fil.pay) D.sales = (D.sales || []).filter(x => (x.paymentMethod || 'Para') === fil.pay);
   if (fil.warehouse) D.moves = (D.moves || []).filter(v => (v.warehouse || 'Magazina Kryesore') === fil.warehouse);
   if (fil.productId) { D.moves = (D.moves || []).filter(v => v.productId === fil.productId); D.products = (D.products || []).filter(pr => pr.id === fil.productId); }
+  if (fil.moveType) D.moves = (D.moves || []).filter(v => v.type === fil.moveType);
+  if (fil.expCat) D.expenses = (D.expenses || []).filter(e => (e.category || '') === fil.expCat);
   if (fil.q) {
     const q = String(fil.q).toLowerCase();
     D.pos = (D.pos || []).filter(x => String(x.supplierName || '').toLowerCase().includes(q) || String(x.poNumber || '').toLowerCase().includes(q));
@@ -4955,16 +4960,16 @@ function buildAlphaReport(id, fil, D) {
   if (id === 'Rap_BlerjeRegjistriPermbledhes') {
     spec = { title: 'Regjistri Përmbledhës i blerjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }],
       groups: [{ label: 'Dokumenti', span: 7 }, { label: 'Monedha Fature', span: 4 }, { label: 'Monedha Baze', span: 2 }],
-      columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'nr', label: 'Nr.' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'mon', label: 'Monedha' }, { key: 'kursi', label: 'Kursi', num: 1 }, { key: 'kodi', label: 'Kodi' }, { key: 'emertimi', label: 'Emertimi', align: 'l' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }, { key: 'tvshb', label: 'TVSH', num: 1 }, { key: 'totalib', label: 'Totali', num: 1 }] };
+      columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'nr', label: 'Nr.', link: 'po', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'mon', label: 'Monedha' }, { key: 'kursi', label: 'Kursi', num: 1 }, { key: 'kodi', label: 'Kodi' }, { key: 'emertimi', label: 'Emertimi', align: 'l' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }, { key: 'tvshb', label: 'TVSH', num: 1 }, { key: 'totalib', label: 'Totali', num: 1 }] };
     totals = { nentotal: 0, zbritje: 0, tvsh: 0, totali: 0, tvshb: 0, totalib: 0 };
     (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => {
       const v = alphaVatSplit(p.total);
-      rows.push({ rend: rows.length + 1, lloji: 'FB', nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), mon: 'LEK', kursi: 1, kodi: p.supplierId || '', emertimi: p.supplierName || '', nentotal: v.net, zbritje: 0, tvsh: v.tvsh, totali: Number(p.total || 0), tvshb: v.tvsh, totalib: Number(p.total || 0) });
+      rows.push({ rend: rows.length + 1, id: p.id, lloji: 'FB', nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), mon: 'LEK', kursi: 1, kodi: p.supplierId || '', emertimi: p.supplierName || '', nentotal: v.net, zbritje: 0, tvsh: v.tvsh, totali: Number(p.total || 0), tvshb: v.tvsh, totalib: Number(p.total || 0) });
       totals.nentotal += v.net; totals.tvsh += v.tvsh; totals.totali += Number(p.total || 0); totals.tvshb += v.tvsh; totals.totalib += Number(p.total || 0);
     });
   } else if (id === 'Rap_BlerjeRegjistriAnalitik') {
     spec = { title: 'Regjistri Analitik i blerjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }],
-      columns: [{ key: 'nr', label: 'Nr. Dok' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
+      columns: [{ key: 'nr', label: 'Nr. Dok', link: 'po', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { sasia: 0, vlera: 0, tvsh: 0, totali: 0 };
     (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => {
       (p.items || []).forEach(it => {
@@ -4972,17 +4977,17 @@ function buildAlphaReport(id, fil, D) {
         const cost = Number(it.enteredUnitCost || it.unitCost) || 0;
         const line = Number(it.lineTotal != null ? it.lineTotal : qty * cost) || 0;
         const v = alphaVatSplit(line);
-        rows.push({ rend: rows.length + 1, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), emertimi: p.supplierName || '', artikulli: it.name || '', njesia: it.unitName || 'copë', sasia: qty, cmimi: cost, vlera: v.net, tvsh: v.tvsh, totali: line });
+        rows.push({ rend: rows.length + 1, id: p.id, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), emertimi: p.supplierName || '', artikulli: it.name || '', njesia: it.unitName || 'copë', sasia: qty, cmimi: cost, vlera: v.net, tvsh: v.tvsh, totali: line });
         totals.sasia += qty; totals.vlera += v.net; totals.tvsh += v.tvsh; totals.totali += line;
       });
     });
   } else if (id === 'Rap_LibriShitjes') {
     spec = { title: 'Libri i Shitjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }],
       groups: [{ label: 'Dokumenti', span: 5 }, { label: 'Monedha Fature', span: 3 }, { label: 'Monedha Baze', span: 2 }],
-      columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'nr', label: 'Nr.' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'mon', label: 'Monedha' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }, { key: 'tvshb', label: 'TVSH', num: 1 }, { key: 'totalib', label: 'Totali', num: 1 }] };
+      columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'nr', label: 'Nr.', link: 'sale', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'mon', label: 'Monedha' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }, { key: 'tvshb', label: 'TVSH', num: 1 }, { key: 'totalib', label: 'Totali', num: 1 }] };
     totals = { nentotal: 0, tvsh: 0, totali: 0, tvshb: 0, totalib: 0 };
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
-      rows.push({ rend: rows.length + 1, lloji: 'FAT', nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', mon: 'LEK', nentotal: Number(x.subtotal || 0), tvsh: Number(x.tax || 0), totali: Number(x.total || 0), tvshb: Number(x.tax || 0), totalib: Number(x.total || 0) });
+      rows.push({ rend: rows.length + 1, id: x.id, lloji: 'FAT', nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', mon: 'LEK', nentotal: Number(x.subtotal || 0), tvsh: Number(x.tax || 0), totali: Number(x.total || 0), tvshb: Number(x.tax || 0), totalib: Number(x.total || 0) });
       totals.nentotal += Number(x.subtotal || 0); totals.tvsh += Number(x.tax || 0); totals.totali += Number(x.total || 0); totals.tvshb += Number(x.tax || 0); totals.totalib += Number(x.total || 0);
     });
   } else if (id === 'Rap_ArtikujTeShitur') {
@@ -12482,13 +12487,13 @@ function alphaExtraReports(id, fil, D) {
     rows = Object.keys(m).sort((a, b) => m[b].vlera - m[a].vlera).map(k => m[k]);
     rows.forEach(r => { totals.dok += r.dok; totals.vlera += r.vlera; });
   } else if (id === 'Rap_ShitjeAnalitik') {
-    spec = { title: 'Regjistri Analitik i Shitjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Fature' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera pa TVSH', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: 'Regjistri Analitik i Shitjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Fature', link: 'sale', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera pa TVSH', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { sasia: 0, vlera: 0, tvsh: 0, totali: 0 };
-    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => (x.items || []).forEach(it => { rows.push({ rend: rows.length + 1, nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', artikulli: it.name || '', sasia: Number(it.displayQty != null ? it.displayQty : it.qty) || 0, cmimi: Number(it.unitSalePrice || it.price || 0), vlera: Number(it.lineNet || 0), tvsh: Number(it.lineTax || 0), totali: Number(it.lineTotal || 0) }); totals.sasia += Number(it.displayQty != null ? it.displayQty : it.qty) || 0; totals.vlera += Number(it.lineNet || 0); totals.tvsh += Number(it.lineTax || 0); totals.totali += Number(it.lineTotal || 0); }));
+    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => (x.items || []).forEach(it => { rows.push({ rend: rows.length + 1, id: x.id, nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', artikulli: it.name || '', sasia: Number(it.displayQty != null ? it.displayQty : it.qty) || 0, cmimi: Number(it.unitSalePrice || it.price || 0), vlera: Number(it.lineNet || 0), tvsh: Number(it.lineTax || 0), totali: Number(it.lineTotal || 0) }); totals.sasia += Number(it.displayQty != null ? it.displayQty : it.qty) || 0; totals.vlera += Number(it.lineNet || 0); totals.tvsh += Number(it.lineTax || 0); totals.totali += Number(it.lineTotal || 0); }));
   } else if (id === 'Rap_ShitjePermbledhes') {
-    spec = { title: 'Regjistri Permbledhes i Shitjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Fature' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'pagesa', label: 'Pagesa' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: 'Regjistri Permbledhes i Shitjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Fature', link: 'sale', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'pagesa', label: 'Pagesa' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { nentotal: 0, zbritje: 0, tvsh: 0, totali: 0 };
-    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => { rows.push({ rend: rows.length + 1, nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', pagesa: x.paymentMethod || 'Para', nentotal: Number(x.subtotal || 0), zbritje: Number(x.discount || 0), tvsh: Number(x.tax || 0), totali: Number(x.total || 0) }); totals.nentotal += Number(x.subtotal || 0); totals.zbritje += Number(x.discount || 0); totals.tvsh += Number(x.tax || 0); totals.totali += Number(x.total || 0); });
+    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => { rows.push({ rend: rows.length + 1, id: x.id, nr: x.invoiceNo || '', dt: String(x.createdAt || '').slice(0, 10), klienti: x.customerName || 'Walk-in', pagesa: x.paymentMethod || 'Para', nentotal: Number(x.subtotal || 0), zbritje: Number(x.discount || 0), tvsh: Number(x.tax || 0), totali: Number(x.total || 0) }); totals.nentotal += Number(x.subtotal || 0); totals.zbritje += Number(x.discount || 0); totals.tvsh += Number(x.tax || 0); totals.totali += Number(x.total || 0); });
   } else if (id === 'Rap_PermbledhesFaturimPagesa') {
     spec = { title: 'Regjistri permbledhes faturime dhe pagesa', filters: F, leadCols: [], columns: [{ key: 'klienti', label: 'Klienti', align: 'l' }, { key: 'faturuar', label: 'Faturuar', num: 1 }, { key: 'paguar', label: 'Paguar', num: 1 }, { key: 'balanca', label: 'Balanca', num: 1 }] };
     totals = { faturuar: 0, paguar: 0, balanca: 0 };
@@ -12548,10 +12553,10 @@ function alphaExtraReports(id, fil, D) {
       totals.hyrje += inn; totals.dalje += out; totals.vlera += round2((inn - out) * Number(v.unitCost || 0));
     });
   } else if (id === 'Rap_LidhjaDokumentave') {
-    spec = { title: 'Lidhja e dokumentave', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }], columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'dok', label: 'Dokumenti', align: 'l' }, { key: 'iLidhur', label: 'Dokumenti i lidhur', align: 'l' }, { key: 'pala', label: 'Pala', align: 'l' }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: 'Lidhja e dokumentave', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }], columns: [{ key: 'lloji', label: 'Lloji' }, { key: 'dok', label: 'Dokumenti', align: 'l', link: 'row' }, { key: 'iLidhur', label: 'Dokumenti i lidhur', align: 'l' }, { key: 'pala', label: 'Pala', align: 'l' }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { totali: 0 };
-    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => { rows.push({ rend: rows.length + 1, lloji: 'Shitje', dok: x.invoiceNo || '', iLidhur: 'FD-' + String(x.invoiceNo || '').replace(/[^0-9A-Z]/gi, '').slice(-6), pala: x.customerName || 'Walk-in', totali: Number(x.total || 0) }); totals.totali += Number(x.total || 0); });
-    (D.receipts || []).filter(r => alphaInPeriod(r.createdAt, fil)).forEach(r => { rows.push({ rend: rows.length + 1, lloji: 'Blerje', dok: r.poNumber || '', iLidhur: warehouseDocNoFromReceipt(r), pala: r.supplierName || '', totali: Number(r.total || 0) }); totals.totali += Number(r.total || 0); });
+    (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => { rows.push({ rend: rows.length + 1, _link: 'sale', _id: x.id, lloji: 'Shitje', dok: x.invoiceNo || '', iLidhur: 'FD-' + String(x.invoiceNo || '').replace(/[^0-9A-Z]/gi, '').slice(-6), pala: x.customerName || 'Walk-in', totali: Number(x.total || 0) }); totals.totali += Number(x.total || 0); });
+    (D.receipts || []).filter(r => alphaInPeriod(r.createdAt, fil)).forEach(r => { rows.push({ rend: rows.length + 1, _link: 'receipt', _id: r.id, lloji: 'Blerje', dok: r.poNumber || '', iLidhur: warehouseDocNoFromReceipt(r), pala: r.supplierName || '', totali: Number(r.total || 0) }); totals.totali += Number(r.total || 0); });
   } else if (id === 'Rap_MagazinaGjendja' || id === 'Rap_MagazinaGjendjaNeVlefte') {
     spec = { title: id === 'Rap_MagazinaGjendjaNeVlefte' ? 'Gjendja e magazinës në vleftë' : 'Gjendja e magazinës', filters: F, leadCols: [], columns: [{ key: 'magazina', label: 'Magazina', align: 'l' }, { key: 'artikuj', label: 'Nr. artikujve', num: 1 }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'vlerab', label: 'Vlera blerjes', num: 1 }].concat(id === 'Rap_MagazinaGjendjaNeVlefte' ? [{ key: 'vleras', label: 'Vlera shitjes', num: 1 }] : []) };
     totals = { artikuj: 0, sasia: 0, vlerab: 0, vleras: 0 };
@@ -12653,13 +12658,13 @@ function alphaExtraReports(id, fil, D) {
     let bal = 0;
     Object.keys(per).sort().forEach(d => { const h = round2(per[d].h), dl = round2(per[d].d); bal = round2(bal + h - dl); rows.push({ rend: rows.length + 1, dt: d, hyrje: h, dalje: dl, balancad: round2(h - dl), balanca: bal }); totals.hyrje += h; totals.dalje += dl; });
   } else if (id === 'Rap_BlerjeRegjistriAnalitikFormat2' || id === 'Rap_Blerje_Analitike') {
-    spec = { title: id === 'Rap_Blerje_Analitike' ? 'Blerje Analitike' : 'Regjistri Analitik i blerjeve (Format 2)', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'dt', label: 'Dt. Dok' }, { key: 'nr', label: 'Nr. Dok' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: id === 'Rap_Blerje_Analitike' ? 'Blerje Analitike' : 'Regjistri Analitik i blerjeve (Format 2)', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'dt', label: 'Dt. Dok' }, { key: 'nr', label: 'Nr. Dok', link: 'po', linkId: 'id' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'zbritje', label: 'Zbritje', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { nentotal: 0, zbritje: 0, tvsh: 0, totali: 0 };
-    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => { const v = alphaVatSplit(p.total); rows.push({ rend: rows.length + 1, dt: String(p.createdAt || '').slice(0, 10), nr: p.poNumber || '', emertimi: p.supplierName || '', nentotal: v.net, zbritje: 0, tvsh: v.tvsh, totali: Number(p.total || 0) }); totals.nentotal += v.net; totals.tvsh += v.tvsh; totals.totali += Number(p.total || 0); });
+    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => { const v = alphaVatSplit(p.total); rows.push({ rend: rows.length + 1, id: p.id, dt: String(p.createdAt || '').slice(0, 10), nr: p.poNumber || '', emertimi: p.supplierName || '', nentotal: v.net, zbritje: 0, tvsh: v.tvsh, totali: Number(p.total || 0) }); totals.nentotal += v.net; totals.tvsh += v.tvsh; totals.totali += Number(p.total || 0); });
   } else if (id === 'Rap_BlerjeRegjistriAnalitik_meDetajime') {
-    spec = { title: 'Regjistri analitik i blerjeve me detajime', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Dok' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: 'Regjistri analitik i blerjeve me detajime', filters: F, leadCols: [{ key: 'rend', label: 'Nr. Rend' }], columns: [{ key: 'nr', label: 'Nr. Dok', link: 'po', linkId: 'id' }, { key: 'dt', label: 'Dt. Dok' }, { key: 'emertimi', label: 'Furnitori', align: 'l' }, { key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'sasia', label: 'Sasia', num: 1 }, { key: 'cmimi', label: 'Çmimi', num: 1 }, { key: 'vlera', label: 'Vlera', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { sasia: 0, vlera: 0, tvsh: 0, totali: 0 };
-    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => (p.items || []).forEach(it => { const q = Number(it.enteredQty != null ? it.enteredQty : it.qty) || 0; const c = Number(it.enteredUnitCost || it.unitCost || 0); const line = round2(q * c); const v = alphaVatSplit(line); rows.push({ rend: rows.length + 1, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), emertimi: p.supplierName || '', kodi: it.sku || it.productId || '', artikulli: it.name || '', njesia: it.unitName || 'copë', sasia: q, cmimi: c, vlera: v.net, tvsh: v.tvsh, totali: line }); totals.sasia += q; totals.vlera += v.net; totals.tvsh += v.tvsh; totals.totali += line; }));
+    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => (p.items || []).forEach(it => { const q = Number(it.enteredQty != null ? it.enteredQty : it.qty) || 0; const c = Number(it.enteredUnitCost || it.unitCost || 0); const line = round2(q * c); const v = alphaVatSplit(line); rows.push({ rend: rows.length + 1, id: p.id, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), emertimi: p.supplierName || '', kodi: it.sku || it.productId || '', artikulli: it.name || '', njesia: it.unitName || 'copë', sasia: q, cmimi: c, vlera: v.net, tvsh: v.tvsh, totali: line }); totals.sasia += q; totals.vlera += v.net; totals.tvsh += v.tvsh; totals.totali += line; }));
   } else if (id === 'Rap_LibriBlerjeveSipasMuajve') {
     spec = { title: 'Libri i blerjeve sipas muajve', filters: F, leadCols: [{ key: 'muaji', label: 'Muaji', align: 'l' }], columns: [{ key: 'dok', label: 'Nr. dokumente', num: 1 }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { dok: 0, nentotal: 0, tvsh: 0, totali: 0 };
@@ -12671,9 +12676,9 @@ function alphaExtraReports(id, fil, D) {
     spec = { title: 'Listë çmimesh blerjeje', filters: F, leadCols: [], columns: [{ key: 'kodi', label: 'Kodi' }, { key: 'artikulli', label: 'Artikulli', align: 'l' }, { key: 'njesia', label: 'Njësia' }, { key: 'cmimib', label: 'Çmimi i blerjes', num: 1 }, { key: 'cmimis', label: 'Çmimi i shitjes', num: 1 }, { key: 'marzha', label: 'Marzha %', num: 1 }] };
     (D.products || []).forEach(pr => { const c = Number(pr.cost || 0), pr2 = Number(pr.price || 0); rows.push({ kodi: pr.sku || '', artikulli: pr.name || '', njesia: pr.unit || 'copë', cmimib: c, cmimis: pr2, marzha: c ? round2((pr2 - c) * 100 / c) : 0 }); });
   } else if (id === 'Rap_EksportFaturaveBlerje') {
-    spec = { title: 'Eksportimi i faturave të blerjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }], columns: [{ key: 'nr', label: 'Nr. Fature' }, { key: 'dt', label: 'Data' }, { key: 'furnitori', label: 'Furnitori', align: 'l' }, { key: 'totali', label: 'Totali', num: 1 }] };
+    spec = { title: 'Eksportimi i faturave të blerjeve', filters: F, leadCols: [{ key: 'rend', label: 'Nr.' }], columns: [{ key: 'nr', label: 'Nr. Fature', link: 'po', linkId: 'id' }, { key: 'dt', label: 'Data' }, { key: 'furnitori', label: 'Furnitori', align: 'l' }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { totali: 0 };
-    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => { rows.push({ rend: rows.length + 1, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), furnitori: p.supplierName || '', totali: Number(p.total || 0) }); totals.totali += Number(p.total || 0); });
+    (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => { rows.push({ rend: rows.length + 1, id: p.id, nr: p.poNumber || '', dt: String(p.createdAt || '').slice(0, 10), furnitori: p.supplierName || '', totali: Number(p.total || 0) }); totals.totali += Number(p.total || 0); });
   } else if (id === 'Rap_ShitjeDitore') {
     spec = { title: 'Shitjet ditore', filters: F, leadCols: [], columns: [{ key: 'dt', label: 'Data' }, { key: 'dok', label: 'Nr. faturave', num: 1 }, { key: 'nentotal', label: 'Nentotal', num: 1 }, { key: 'tvsh', label: 'TVSH', num: 1 }, { key: 'totali', label: 'Totali', num: 1 }] };
     totals = { dok: 0, nentotal: 0, tvsh: 0, totali: 0 };
@@ -12724,6 +12729,8 @@ function AlphaReportsView({ user, role }) {
   const [warehouse, setWarehouse] = useState('');
   const [pay, setPay] = useState('');
   const [q, setQ] = useState('');
+  const [moveType, setMoveType] = useState('');
+  const [expCat, setExpCat] = useState('');
   const { loading, data } = useFetch(() => Promise.all([fbGetPurchaseOrders(), fbGetSales(), fbGetProducts(), fbGetExpenses(), fbGetStockMovements(), fbGetWarehouseReceiptsIn(), fbGetSuppliers(), fbGetRecords()]), [from, to]);
   const pos = useMemo(() => (data && data[0] && data[0].success ? data[0].data : []), [data]);
   const sales = useMemo(() => (data && data[1] && data[1].success ? data[1].data : []), [data]);
@@ -12734,8 +12741,18 @@ function AlphaReportsView({ user, role }) {
   const suppliers = useMemo(() => (data && data[6] && data[6].success ? data[6].data : []), [data]);
   const customers = useMemo(() => (data && data[7] && data[7].success ? data[7].data : []), [data]);
   const warehouses = useMemo(() => { const set = new Set(['Magazina Kryesore']); (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore')); return Array.from(set).sort(); }, [moves]);
-  const fil = { from, to, productId, customerId, supplierId, warehouse, pay, q };
-  const built = useMemo(() => buildAlphaReport(sel, fil, { pos, sales, products, expenses, moves, receipts, suppliers, customers }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  const expCats = useMemo(() => Array.from(new Set((expenses || []).map(e => e.category || '').filter(Boolean))).sort(), [expenses]);
+  const fil = { from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat };
+  const built = useMemo(() => buildAlphaReport(sel, fil, { pos, sales, products, expenses, moves, receipts, suppliers, customers }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  const onReportClick = (e) => {
+    const b = e.target.closest('[data-alink]');
+    if (!b) return;
+    const t = b.getAttribute('data-alink'); const idv = b.getAttribute('data-id');
+    if (t === 'sale') { const x = sales.find(v => v.id === idv); if (x) openSaleDocument(x, 'a4', false); }
+    else if (t === 'po') { const po = pos.find(v => v.id === idv); if (po) openPurchaseDocument(po, suppliers.find(sp => sp.id === po.supplierId), false); }
+    else if (t === 'receipt') { const r = receipts.find(v => v.id === idv); if (r) openWarehouseReceiptInDocument(r, false); }
+  };
+  const TOTLBL = { totali: 'Totali', totalib: 'Totali', nentotal: 'Pa TVSH', tvsh: 'TVSH', hyrje: 'Hyrje', dalje: 'Dalje', balanca: 'Balanca', sasia: 'Sasia', vlera: 'Vlera', dok: 'Dokumente', faturuar: 'Faturuar', paguar: 'Paguar', kosto: 'Kosto', marzha: 'Marzha', vlerab: 'Vlera blerjes', vleras: 'Vlera shitjes', gjendjev: 'Vlera gjendjes' };
   const MODULES = [
     { label: 'BLERJE', items: [
       ['Rap_BlerjeRegjistriPermbledhes', 'Regjistri permbledhes i blerjeve'],
@@ -12825,8 +12842,15 @@ function AlphaReportsView({ user, role }) {
           <select value={productId} onChange={e => setProductId(e.target.value)} style={{ padding: 6, maxWidth: 160 }} title="Artikulli"><option value="">Artikull: të gjithë</option>{products.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select>
           <select value={warehouse} onChange={e => setWarehouse(e.target.value)} style={{ padding: 6, maxWidth: 150 }} title="Magazina"><option value="">Magazina: të gjitha</option>{warehouses.map(w => <option key={w} value={w}>{w}</option>)}</select>
           <select value={pay} onChange={e => setPay(e.target.value)} style={{ padding: 6 }} title="Mënyra e pagesës"><option value="">Pagesa: të gjitha</option><option value="Para">Para</option><option value="Credit">Kredi</option></select>
+          <select value={moveType} onChange={e => setMoveType(e.target.value)} style={{ padding: 6 }} title="Tipi i lëvizjes"><option value="">Lëvizje: të gjitha</option><option value="in">Hyrje</option><option value="out">Dalje</option></select>
+          <select value={expCat} onChange={e => setExpCat(e.target.value)} style={{ padding: 6, maxWidth: 150 }} title="Kategoria e shpenzimit"><option value="">Shpenzim: të gjitha</option>{expCats.map(c => <option key={c} value={c}>{c}</option>)}</select>
         </div>
-        <div className="right"><span className="type-chip">{built.rows.length} rreshta</span></div>
+        <div className="right" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {built.totals && Object.keys(built.totals).slice(0, 6).map(k => (
+            <span key={k} className="type-chip">{TOTLBL[k] || k}: {Number(built.totals[k] || 0).toFixed(2)}</span>
+          ))}
+          <span className="type-chip">{built.rows.length} rreshta</span>
+        </div>
       </div>
       <div style={{ padding: '0 0 12px' }}>
         {MODULES.map(m => (
@@ -12843,7 +12867,7 @@ function AlphaReportsView({ user, role }) {
           </div>
         ))}
       </div>
-      <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 6, overflow: 'auto' }}>
+      <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 6, overflow: 'auto' }} onClick={onReportClick}>
         <div dangerouslySetInnerHTML={{ __html: built.html }} />
       </div>
     </div>

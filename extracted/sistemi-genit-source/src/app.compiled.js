@@ -633,7 +633,14 @@ function alphaReportHtml(spec, rows, totals) {
   } else {
     head2 = '<tr>' + lead.map(c => '<th class="l">' + alphaEsc(c.label) + '</th>').join('') + spec.columns.map(c => '<th class="' + (c.num ? 'r' : c.align || '') + '">' + alphaEsc(c.label) + '</th>').join('') + '</tr>';
   }
-  const body = (rows || []).map(r => '<tr>' + lead.map(c => '<td class="l">' + alphaEsc(r[c.key]) + '</td>').join('') + spec.columns.map(c => '<td class="' + (c.num ? 'r' : c.align || '') + '">' + (c.num ? alphaF2(r[c.key]) : alphaEsc(r[c.key])) + '</td>').join('') + '</tr>').join('');
+  const body = (rows || []).map(r => '<tr>' + lead.map(c => '<td class="l">' + alphaEsc(r[c.key]) + '</td>').join('') + spec.columns.map(c => {
+    if (c.link) {
+      const lt = c.link === 'row' ? r._link || '' : c.link;
+      const lid = c.link === 'row' ? r._id || '' : r[c.linkId || 'id'] || '';
+      return '<td class="l"><button type="button" class="doc-link" data-alink="' + alphaEsc(lt) + '" data-id="' + alphaEsc(lid) + '"><i class="fas fa-arrow-right"></i>' + alphaEsc(r[c.key]) + '</button></td>';
+    }
+    return '<td class="' + (c.num ? 'r' : c.align || '') + '">' + (c.num ? alphaF2(r[c.key]) : alphaEsc(r[c.key])) + '</td>';
+  }).join('') + '</tr>').join('');
   let totRow = '';
   if (totals) {
     totRow = '<tr class="alpha-total"><td class="l" colspan="' + (lead.length + 1) + '">Total:</td>' + spec.columns.map(c => '<td class="r">' + (totals[c.key] != null ? alphaF2(totals[c.key]) : '') + '</td>').join('') + '</tr>';
@@ -663,6 +670,8 @@ function buildAlphaReport(id, fil, D) {
     D.moves = (D.moves || []).filter(v => v.productId === fil.productId);
     D.products = (D.products || []).filter(pr => pr.id === fil.productId);
   }
+  if (fil.moveType) D.moves = (D.moves || []).filter(v => v.type === fil.moveType);
+  if (fil.expCat) D.expenses = (D.expenses || []).filter(e => (e.category || '') === fil.expCat);
   if (fil.q) {
     const q = String(fil.q).toLowerCase();
     D.pos = (D.pos || []).filter(x => String(x.supplierName || '').toLowerCase().includes(q) || String(x.poNumber || '').toLowerCase().includes(q));
@@ -708,7 +717,9 @@ function buildAlphaReport(id, fil, D) {
         label: 'Lloji'
       }, {
         key: 'nr',
-        label: 'Nr.'
+        label: 'Nr.',
+        link: 'po',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -764,6 +775,7 @@ function buildAlphaReport(id, fil, D) {
       const v = alphaVatSplit(p.total);
       rows.push({
         rend: rows.length + 1,
+        id: p.id,
         lloji: 'FB',
         nr: p.poNumber || '',
         dt: String(p.createdAt || '').slice(0, 10),
@@ -794,7 +806,9 @@ function buildAlphaReport(id, fil, D) {
       }],
       columns: [{
         key: 'nr',
-        label: 'Nr. Dok'
+        label: 'Nr. Dok',
+        link: 'po',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -845,6 +859,7 @@ function buildAlphaReport(id, fil, D) {
         const v = alphaVatSplit(line);
         rows.push({
           rend: rows.length + 1,
+          id: p.id,
           nr: p.poNumber || '',
           dt: String(p.createdAt || '').slice(0, 10),
           emertimi: p.supplierName || '',
@@ -885,7 +900,9 @@ function buildAlphaReport(id, fil, D) {
         label: 'Lloji'
       }, {
         key: 'nr',
-        label: 'Nr.'
+        label: 'Nr.',
+        link: 'sale',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -928,6 +945,7 @@ function buildAlphaReport(id, fil, D) {
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
       rows.push({
         rend: rows.length + 1,
+        id: x.id,
         lloji: 'FAT',
         nr: x.invoiceNo || '',
         dt: String(x.createdAt || '').slice(0, 10),
@@ -17033,7 +17051,9 @@ function alphaExtraReports(id, fil, D) {
       }],
       columns: [{
         key: 'nr',
-        label: 'Nr. Fature'
+        label: 'Nr. Fature',
+        link: 'sale',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -17076,6 +17096,7 @@ function alphaExtraReports(id, fil, D) {
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => (x.items || []).forEach(it => {
       rows.push({
         rend: rows.length + 1,
+        id: x.id,
         nr: x.invoiceNo || '',
         dt: String(x.createdAt || '').slice(0, 10),
         klienti: x.customerName || 'Walk-in',
@@ -17101,7 +17122,9 @@ function alphaExtraReports(id, fil, D) {
       }],
       columns: [{
         key: 'nr',
-        label: 'Nr. Fature'
+        label: 'Nr. Fature',
+        link: 'sale',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -17139,6 +17162,7 @@ function alphaExtraReports(id, fil, D) {
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
       rows.push({
         rend: rows.length + 1,
+        id: x.id,
         nr: x.invoiceNo || '',
         dt: String(x.createdAt || '').slice(0, 10),
         klienti: x.customerName || 'Walk-in',
@@ -17638,7 +17662,8 @@ function alphaExtraReports(id, fil, D) {
       }, {
         key: 'dok',
         label: 'Dokumenti',
-        align: 'l'
+        align: 'l',
+        link: 'row'
       }, {
         key: 'iLidhur',
         label: 'Dokumenti i lidhur',
@@ -17659,6 +17684,8 @@ function alphaExtraReports(id, fil, D) {
     (D.sales || []).filter(x => x.status !== 'cancelled' && alphaInPeriod(x.createdAt, fil)).forEach(x => {
       rows.push({
         rend: rows.length + 1,
+        _link: 'sale',
+        _id: x.id,
         lloji: 'Shitje',
         dok: x.invoiceNo || '',
         iLidhur: 'FD-' + String(x.invoiceNo || '').replace(/[^0-9A-Z]/gi, '').slice(-6),
@@ -17670,6 +17697,8 @@ function alphaExtraReports(id, fil, D) {
     (D.receipts || []).filter(r => alphaInPeriod(r.createdAt, fil)).forEach(r => {
       rows.push({
         rend: rows.length + 1,
+        _link: 'receipt',
+        _id: r.id,
         lloji: 'Blerje',
         dok: r.poNumber || '',
         iLidhur: warehouseDocNoFromReceipt(r),
@@ -18308,7 +18337,9 @@ function alphaExtraReports(id, fil, D) {
         label: 'Dt. Dok'
       }, {
         key: 'nr',
-        label: 'Nr. Dok'
+        label: 'Nr. Dok',
+        link: 'po',
+        linkId: 'id'
       }, {
         key: 'emertimi',
         label: 'Furnitori',
@@ -18341,6 +18372,7 @@ function alphaExtraReports(id, fil, D) {
       const v = alphaVatSplit(p.total);
       rows.push({
         rend: rows.length + 1,
+        id: p.id,
         dt: String(p.createdAt || '').slice(0, 10),
         nr: p.poNumber || '',
         emertimi: p.supplierName || '',
@@ -18363,7 +18395,9 @@ function alphaExtraReports(id, fil, D) {
       }],
       columns: [{
         key: 'nr',
-        label: 'Nr. Dok'
+        label: 'Nr. Dok',
+        link: 'po',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Dt. Dok'
@@ -18416,6 +18450,7 @@ function alphaExtraReports(id, fil, D) {
       const v = alphaVatSplit(line);
       rows.push({
         rend: rows.length + 1,
+        id: p.id,
         nr: p.poNumber || '',
         dt: String(p.createdAt || '').slice(0, 10),
         emertimi: p.supplierName || '',
@@ -18540,7 +18575,9 @@ function alphaExtraReports(id, fil, D) {
       }],
       columns: [{
         key: 'nr',
-        label: 'Nr. Fature'
+        label: 'Nr. Fature',
+        link: 'po',
+        linkId: 'id'
       }, {
         key: 'dt',
         label: 'Data'
@@ -18560,6 +18597,7 @@ function alphaExtraReports(id, fil, D) {
     (D.pos || []).filter(p => p.status === 'received' && alphaInPeriod(p.createdAt, fil)).forEach(p => {
       rows.push({
         rend: rows.length + 1,
+        id: p.id,
         nr: p.poNumber || '',
         dt: String(p.createdAt || '').slice(0, 10),
         furnitori: p.supplierName || '',
@@ -18864,6 +18902,8 @@ function AlphaReportsView({
   const [warehouse, setWarehouse] = useState('');
   const [pay, setPay] = useState('');
   const [q, setQ] = useState('');
+  const [moveType, setMoveType] = useState('');
+  const [expCat, setExpCat] = useState('');
   const {
     loading,
     data
@@ -18881,6 +18921,7 @@ function AlphaReportsView({
     (moves || []).forEach(v => set.add(v.warehouse || 'Magazina Kryesore'));
     return Array.from(set).sort();
   }, [moves]);
+  const expCats = useMemo(() => Array.from(new Set((expenses || []).map(e => e.category || '').filter(Boolean))).sort(), [expenses]);
   const fil = {
     from,
     to,
@@ -18889,7 +18930,9 @@ function AlphaReportsView({
     supplierId,
     warehouse,
     pay,
-    q
+    q,
+    moveType,
+    expCat
   };
   const built = useMemo(() => buildAlphaReport(sel, fil, {
     pos,
@@ -18900,7 +18943,42 @@ function AlphaReportsView({
     receipts,
     suppliers,
     customers
-  }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  }), [sel, from, to, productId, customerId, supplierId, warehouse, pay, q, moveType, expCat, pos, sales, products, expenses, moves, receipts, suppliers, customers]);
+  const onReportClick = e => {
+    const b = e.target.closest('[data-alink]');
+    if (!b) return;
+    const t = b.getAttribute('data-alink');
+    const idv = b.getAttribute('data-id');
+    if (t === 'sale') {
+      const x = sales.find(v => v.id === idv);
+      if (x) openSaleDocument(x, 'a4', false);
+    } else if (t === 'po') {
+      const po = pos.find(v => v.id === idv);
+      if (po) openPurchaseDocument(po, suppliers.find(sp => sp.id === po.supplierId), false);
+    } else if (t === 'receipt') {
+      const r = receipts.find(v => v.id === idv);
+      if (r) openWarehouseReceiptInDocument(r, false);
+    }
+  };
+  const TOTLBL = {
+    totali: 'Totali',
+    totalib: 'Totali',
+    nentotal: 'Pa TVSH',
+    tvsh: 'TVSH',
+    hyrje: 'Hyrje',
+    dalje: 'Dalje',
+    balanca: 'Balanca',
+    sasia: 'Sasia',
+    vlera: 'Vlera',
+    dok: 'Dokumente',
+    faturuar: 'Faturuar',
+    paguar: 'Paguar',
+    kosto: 'Kosto',
+    marzha: 'Marzha',
+    vlerab: 'Vlera blerjes',
+    vleras: 'Vlera shitjes',
+    gjendjev: 'Vlera gjendjes'
+  };
   const MODULES = [{
     label: 'BLERJE',
     items: [['Rap_BlerjeRegjistriPermbledhes', 'Regjistri permbledhes i blerjeve'], ['Rap_BlerjeRegjistriAnalitik', 'Regjistri analitik i blerjeve'], ['Rap_BlerjeRegjistriAnalitikFormat2', 'Regjistri analitik (Format 2)'], ['Rap_BlerjeRegjistriAnalitik_meDetajime', 'Regjistri analitik me detajime'], ['Rap_Blerje_Analitike', 'Blerje Analitike'], ['Rap_LibriBlerjeveSipasMuajve', 'Libri i blerjeve sipas muajve'], ['Rap_ArtikujTeBlere', 'Artikuj te blere'], ['Rap_ArtikujBlereDet', 'Artikuj te blere me detajime'], ['Rap_ListeCmimeshBlerje', 'Liste cmimesh blerje'], ['Rap_EksportFaturaveBlerje', 'Eksportimi i faturave te blerjeve'], ['Rap_SituacionIFurnitoreveLandscape', 'Situacion i furnitorit']]
@@ -19076,9 +19154,43 @@ function AlphaReportsView({
     value: "Para"
   }, "Para"), React.createElement("option", {
     value: "Credit"
-  }, "Kredi"))), React.createElement("div", {
-    className: "right"
-  }, React.createElement("span", {
+  }, "Kredi")), React.createElement("select", {
+    value: moveType,
+    onChange: e => setMoveType(e.target.value),
+    style: {
+      padding: 6
+    },
+    title: "Tipi i l\xEBvizjes"
+  }, React.createElement("option", {
+    value: ""
+  }, "L\xEBvizje: t\xEB gjitha"), React.createElement("option", {
+    value: "in"
+  }, "Hyrje"), React.createElement("option", {
+    value: "out"
+  }, "Dalje")), React.createElement("select", {
+    value: expCat,
+    onChange: e => setExpCat(e.target.value),
+    style: {
+      padding: 6,
+      maxWidth: 150
+    },
+    title: "Kategoria e shpenzimit"
+  }, React.createElement("option", {
+    value: ""
+  }, "Shpenzim: t\xEB gjitha"), expCats.map(c => React.createElement("option", {
+    key: c,
+    value: c
+  }, c)))), React.createElement("div", {
+    className: "right",
+    style: {
+      display: 'flex',
+      gap: 6,
+      flexWrap: 'wrap'
+    }
+  }, built.totals && Object.keys(built.totals).slice(0, 6).map(k => React.createElement("span", {
+    key: k,
+    className: "type-chip"
+  }, TOTLBL[k] || k, ": ", Number(built.totals[k] || 0).toFixed(2))), React.createElement("span", {
     className: "type-chip"
   }, built.rows.length, " rreshta"))), React.createElement("div", {
     style: {
@@ -19123,7 +19235,8 @@ function AlphaReportsView({
       padding: 12,
       borderRadius: 6,
       overflow: 'auto'
-    }
+    },
+    onClick: onReportClick
   }, React.createElement("div", {
     dangerouslySetInnerHTML: {
       __html: built.html
