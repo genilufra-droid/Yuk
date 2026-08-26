@@ -114,6 +114,10 @@ const appBridge = {
   // backup / restore
   createBackup: (payload) => ipcRenderer.invoke('backup:create', payload),
   restoreBackup: () => ipcRenderer.invoke('backup:restore'),
+  createBackupCsv: () => ipcRenderer.invoke('backup:createCsv'),
+  createBackupHtml: () => ipcRenderer.invoke('backup:createHtml'),
+  createBackupDb: () => ipcRenderer.invoke('backup:createDb'),
+  factoryReset: () => ipcRenderer.invoke('system:factoryReset'),
 
   // app info
   info: () => ipcRenderer.invoke('app:info'),

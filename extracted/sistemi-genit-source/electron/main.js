@@ -440,6 +440,88 @@ ipcMain.handle('backup:create', async (event, payload) => {
   }
 });
 
+function allTableRows() {
+  const names = db.raw().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map(x => x.name);
+  const out = {};
+  for (const t of names) {
+    out[t] = db.raw().prepare('SELECT * FROM ' + JSON.stringify(t).replace(/"/g, '"') + '').all();
+  }
+  return out;
+}
+function csvEscape(v) {
+  if (v === null || v === undefined) return '';
+  let s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+ipcMain.handle('backup:createCsv', async () => {
+  try {
+    const tables = allTableRows();
+    let csv = '';
+    for (const t of Object.keys(tables)) {
+      csv += '# TABLE ' + t + '\r\n';
+      const rows = tables[t];
+      if (rows.length) {
+        csv += Object.keys(rows[0]).map(csvEscape).join(',') + '\r\n';
+        for (const r of rows) csv += Object.keys(rows[0]).map(k => csvEscape(r[k])).join(',') + '\r\n';
+      }
+      csv += '\r\n';
+    }
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, { title: 'Ruaj backup CSV', defaultPath: 'Sistemi_Genit_Backup_' + stamp + '.csv', filters: [{ name: 'CSV', extensions: ['csv'] }] });
+    if (canceled || !filePath) return { success: false, message: 'Anuluar' };
+    fs.writeFileSync(filePath, '' + csv);
+    return { success: true, path: filePath };
+  } catch (err) { logError('backup:createCsv', err); return { success: false, message: err.message }; }
+});
+
+ipcMain.handle('backup:createHtml', async () => {
+  try {
+    const tables = allTableRows();
+    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Sistemi Genit — Backup</title><style>body{font-family:Arial;font-size:11px}h2{color:#714B67}table{border-collapse:collapse;margin:0 0 18px}td,th{border:1px solid #808080;padding:3px 6px}th{background:#F0FFF0}</style></head><body><h1>Backup Sistemi Genit — ' + new Date().toLocaleString() + '</h1>';
+    for (const t of Object.keys(tables)) {
+      const rows = tables[t];
+      html += '<h2>' + t + ' (' + rows.length + ')</h2><table>';
+      if (rows.length) {
+        html += '<tr>' + Object.keys(rows[0]).map(k => '<th>' + k + '</th>').join('') + '</tr>';
+        for (const r of rows) html += '<tr>' + Object.keys(rows[0]).map(k => '<td>' + (r[k] === null || r[k] === undefined ? '' : String(typeof r[k] === 'object' ? JSON.stringify(r[k]) : r[k]).replace(/&/g, '&amp;').replace(/</g, '&lt;')) + '</td>').join('') + '</tr>';
+      }
+      html += '</table>';
+    }
+    html += '</body></html>';
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, { title: 'Ruaj backup HTML', defaultPath: 'Sistemi_Genit_Backup_' + stamp + '.html', filters: [{ name: 'HTML', extensions: ['html'] }] });
+    if (canceled || !filePath) return { success: false, message: 'Anuluar' };
+    fs.writeFileSync(filePath, html);
+    return { success: true, path: filePath };
+  } catch (err) { logError('backup:createHtml', err); return { success: false, message: err.message }; }
+});
+
+ipcMain.handle('backup:createDb', async () => {
+  try {
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, { title: 'Ruaj backup DB', defaultPath: 'Sistemi_Genit_Backup_' + stamp + '.db', filters: [{ name: 'Database', extensions: ['db'] }] });
+    if (canceled || !filePath) return { success: false, message: 'Anuluar' };
+    db.backupTo(filePath);
+    return { success: true, path: filePath };
+  } catch (err) { logError('backup:createDb', err); return { success: false, message: err.message }; }
+});
+
+ipcMain.handle('system:factoryReset', async () => {
+  try {
+    const dbDir = path.join(userDataDir, 'data');
+    const activePath = path.join(dbDir, 'sistemi_genit.db');
+    try { db.close(); } catch (e) {}
+    // safety: keep the old database renamed, then restart fresh (Initial Setup)
+    if (fs.existsSync(activePath)) fs.renameSync(activePath, activePath + '.factory-reset-' + Date.now());
+    for (const ext of ['-wal', '-shm']) { const p2 = activePath + ext; if (fs.existsSync(p2)) try { fs.unlinkSync(p2); } catch (e) {} }
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
+  } catch (err) { logError('system:factoryReset', err); return { success: false, message: err.message }; }
+});
+
 ipcMain.handle('backup:restore', async (event) => {
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {

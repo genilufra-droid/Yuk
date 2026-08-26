@@ -16634,6 +16634,68 @@ function ImportExportView({
     }
     setBusy(false);
   };
+  const apiBackup = window.sistemiGenitAPI;
+  const doneMsg = (res, label) => {
+    if (res && res.success) Swal.fire({
+      icon: 'success',
+      title: label + ' u ruajt',
+      text: res.path || '',
+      timer: 2200,
+      showConfirmButton: false
+    });else if (res && !/Anuluar/.test(res.message || '')) Swal.fire({
+      icon: 'error',
+      title: label + ' dështoi',
+      text: res.message || ''
+    });
+  };
+  const needApi = () => {
+    if (!apiBackup || !apiBackup.createBackupCsv) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Kërkon aplikacionin desktop (Electron)'
+      });
+      return false;
+    }
+    return true;
+  };
+  const doBackupCsv = async () => {
+    if (!needApi()) return;
+    setBusy(true);
+    doneMsg(await apiBackup.createBackupCsv(), 'Backup CSV');
+    setBusy(false);
+  };
+  const doBackupHtml = async () => {
+    if (!needApi()) return;
+    setBusy(true);
+    doneMsg(await apiBackup.createBackupHtml(), 'Backup HTML');
+    setBusy(false);
+  };
+  const doBackupDb = async () => {
+    if (!needApi()) return;
+    setBusy(true);
+    doneMsg(await apiBackup.createBackupDb(), 'Backup DB');
+    setBusy(false);
+  };
+  const doFactoryReset = async () => {
+    if (!needApi()) return;
+    const conf = await Swal.fire({
+      icon: 'warning',
+      title: 'Factory Reset',
+      html: '<p>Kjo i fshin TË GJITHA të dhënat dhe e kthen aplikacionin në gjendjen fillestare (Initial Setup).</p><p>Një kopje sigurie e DB-së mbahet e rinominuar te të dhënat e aplikacionit.</p><p>Shkruaj <b>RESET</b> për të vazhduar:</p>',
+      input: 'text',
+      showCancelButton: true,
+      confirmButtonText: 'Fshi gjithçka',
+      cancelButtonText: 'Anulo',
+      confirmButtonColor: '#d9534f'
+    });
+    if (!conf.isConfirmed || String(conf.value || '').trim() !== 'RESET') return;
+    const res = await apiBackup.factoryReset();
+    if (res && !res.success) Swal.fire({
+      icon: 'error',
+      title: 'Factory reset dështoi',
+      text: res.message
+    });
+  };
   const onRestoreFile = async file => {
     if (!file) return;
     setBusy(true);
@@ -16849,7 +16911,28 @@ function ImportExportView({
     onClick: doBackupXlsx
   }, React.createElement("i", {
     className: "fas fa-file-excel"
-  }), " Backup Excel (shum\xEB flet\xEB)"))), React.createElement("div", {
+  }), " Backup Excel (shum\xEB flet\xEB)"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: busy,
+    onClick: doBackupCsv
+  }, React.createElement("i", {
+    className: "fas fa-file-csv"
+  }), " Backup CSV"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: busy,
+    onClick: doBackupHtml
+  }, React.createElement("i", {
+    className: "fas fa-file-code"
+  }), " Backup HTML"), React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: busy,
+    onClick: doBackupDb
+  }, React.createElement("i", {
+    className: "fas fa-database"
+  }), " Backup DB (.db)"))), React.createElement("div", {
     className: "ie-backup-box"
   }, React.createElement("h3", null, React.createElement("i", {
     className: "fas fa-upload"
@@ -16900,6 +16983,30 @@ function ImportExportView({
   }, React.createElement("i", {
     className: "fas fa-database"
   }), " Restore nga JSON"))), React.createElement("div", {
+    className: "ie-backup-box",
+    style: {
+      borderColor: '#d9534f'
+    }
+  }, React.createElement("h3", {
+    style: {
+      color: '#d9534f'
+    }
+  }, React.createElement("i", {
+    className: "fas fa-triangle-exclamation"
+  }), " Factory Reset (kthim n\xEB gjendje fabrike)"), React.createElement("p", {
+    style: {
+      color: '#6c757d',
+      fontSize: 13,
+      margin: '0 0 8px'
+    }
+  }, "Fshin t\xEB gjitha t\xEB dh\xEBnat dhe rinis aplikacionin te Initial Setup. P\xEBrdore vet\xEBm n\xEBse je i sigurt."), React.createElement("button", {
+    type: "button",
+    className: "btn btn-danger",
+    disabled: busy,
+    onClick: doFactoryReset
+  }, React.createElement("i", {
+    className: "fas fa-rotate-left"
+  }), " Factory Reset")), React.createElement("div", {
     className: "ie-backup-box"
   }, React.createElement("h3", null, React.createElement("i", {
     className: "fas fa-circle-info"

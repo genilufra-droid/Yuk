@@ -3653,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.2.2'
+      initializedVersion: '1.2.3'
     };
 
     try {
@@ -5161,6 +5161,9 @@ function fleteXlsMatrix(o) {
   M.push(['Nr', 'Emërtimi i mallit', 'Njësia', 'Sasia', 'Çmimi', 'Vlefta']);
   (o.rows || []).slice(0, 21).forEach(function (r, i) { M.push([i + 1, r.name || '', r.unit || '', Number(r.qty) || 0, Number(r.price) || 0, Number(r.value) || 0]); });
   for (let i = (o.rows || []).length; i < 21; i++) M.push([i + 1, '', '', '', '', '']);
+  let tq = 0, tv = 0;
+  (o.rows || []).slice(0, 21).forEach(function (r) { tq += Number(r.qty) || 0; tv += Number(r.value) || 0; });
+  M.push(['', 'Totali:', '', Math.round(tq * 100) / 100, '', Math.round(tv * 100) / 100]);
   M.push(['Emri, mbiemri', 'Magazinieri', 'Marrësi në dorëzim', 'Transportuesi', 'Llogaritari', '']);
   M.push(['Nënshkrimi', '', '', '', '', '']);
   return { matrix: M, headerIdx: headerIdx, totalsIdx: null };
@@ -5258,6 +5261,9 @@ function buildWarehouseHtml(sale) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
+  let totQ = 0, totV = 0;
+  rows.slice(0, 21).forEach(function (r) { totQ += Number(r.qty) || 0; totV += Number(r.value) || 0; });
+  body += '<tr><td style="border-top:2px solid #111"></td><td style="text-align:left;border-top:2px solid #111"><b>Totali:</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fQ(totQ) + '</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fL(totV) + '</b></td></tr>';
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' +
     '<div class="fd-head">' +
       '<div><div class="fd-topline">' + escL(saleBuyerName(sale) || '') + '</div><div class="fd-topline"></div></div>' +
@@ -5287,6 +5293,9 @@ function buildWarehouseInHtml(receipt) {
   for (let i = Math.min(rows.length, 21); i < 21; i += 1) {
     body += '<tr><td>' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td></tr>';
   }
+  let totQ = 0, totV = 0;
+  rows.slice(0, 21).forEach(function (r) { totQ += Number(r.qty) || 0; totV += Number(r.value) || 0; });
+  body += '<tr><td style="border-top:2px solid #111"></td><td style="text-align:left;border-top:2px solid #111"><b>Totali:</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fQ(totQ) + '</b></td><td style="border-top:2px solid #111"></td><td style="border-top:2px solid #111"><b>' + fL(totV) + '</b></td></tr>';
   return '<style>@page{size:A5 portrait;margin:0}</style><div class="sheet doc-fd">' +
     '<div class="fd-head">' +
       '<div><div class="fd-topline">' + escL(receipt.supplierName || '') + '</div><div class="fd-topline"></div></div>' +
