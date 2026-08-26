@@ -645,6 +645,9 @@ table.dataTable tbody tr.row-ok td { background: #f3faf5 !important; }
 .fd-signs td { border:1px solid #111; padding:3px 4px; text-align:center; font-weight:700; font-size:10px; }
 .fd-signs td.a { text-align:left; }
 .fd-signs tr.s td { height:9mm; font-weight:400; }
+.doc-link { background:none; border:none; padding:0; color:#714B67; font-weight:800; cursor:pointer; text-decoration:underline; font-size:inherit; }
+.doc-link:hover { color:#4d3347; }
+.doc-link i { margin-right:5px; font-size:0.85em; }
 @media print {
   body[data-print-mode] * { visibility:hidden !important; }
   body[data-print-mode="thermal"] .thermal-slip-print, body[data-print-mode="thermal"] .thermal-slip-print *,
@@ -3650,7 +3653,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.1.2'
+      initializedVersion: '1.1.3'
     };
 
     try {
@@ -6467,6 +6470,10 @@ function getDtRowData(table, el) {
   }
   return rowData || null;
 }
+function docLinkHtml(action, id, label) {
+  const escL = (typeof esc === 'function') ? esc : function (x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  return '<button type="button" class="doc-link" data-action="' + action + '" data-id="' + escL(id) + '"><i class="fas fa-arrow-right"></i>' + escL(label) + '</button>';
+}
 function actionBtn(action, icon, label, extraClass) {
   return `<button type="button" class="product-action-btn odoo-row-btn ${extraClass || ''}" data-action="${action}" title="${label}"><i class="fas ${icon}"></i><span class="btn-label"> ${label}</span></button>`;
 }
@@ -8110,11 +8117,11 @@ function StockView({ user, role, setActiveMenu }) {
           { data: 'qty', title: 'Në njësi bazë', render: (d, t, row) => t === 'display' ? esc(formatQtyWithUnits(d, productMap[row.productId])) : d },
           { data: 'unitCost', title: 'Kosto bazë', defaultContent: '-', render: (d, t) => t === 'display' ? (d ? money(d) : '-') : (d || 0) },
           { data: 'reason', title: 'Arsyeja', render: (d, t) => t === 'display' ? esc(d || '') : d },
-          { data: 'reference', title: 'Referencë', defaultContent: '-', render: (d, t) => t === 'display' ? esc(d || '-') : d },
+          { data: 'reference', title: 'Referencë', defaultContent: '-', render: (d, t, row) => t === 'display' ? (d ? docLinkHtml('openref', row.id, d) : '-') : (d || '') },
           { data: 'balance', title: 'Balanca', render: (d, t, row) => t === 'display' ? `<strong>${esc(formatQtyWithUnits(d, productMap[row.productId]))}</strong>` : d },
           { data: 'performedBy', title: 'Përdoruesi', render: (d, t) => t === 'display' ? esc(d || '') : d },
           { data: 'createdAt', title: 'Data/Ora', render: (d, t) => t === 'display' ? formatDateForDisplay(d) : d },
-          { data: null, title: 'Veprime', orderable: false, render: (d,t,row) => (row && row.type === 'out' ? actionBtn('printdoc', 'fa-print', 'Fletë Dalje') : '') + (role === 'Admin' ? actionBtn('delete', 'fa-trash', 'Fshi', 'delete') : '') }
+          { data: null, title: 'Veprime', orderable: false, render: (d,t,row) => (row && row.type === 'out' ? actionBtn('printdoc', 'fa-print', 'Fletë Dalje') : (row && row.type === 'in' ? actionBtn('printdoc', 'fa-print', 'Fletë Hyrje') : '')) + (role === 'Admin' ? actionBtn('delete', 'fa-trash', 'Fshi', 'delete') : '') }
         ],
         pageLength: 80,
         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
@@ -8130,6 +8137,24 @@ function StockView({ user, role, setActiveMenu }) {
       if (!rowData || !rowData.id) return;
       const act = $(this).data('action');
       if (act === 'printdoc') { const mv = byId[rowData.id] || rowData; openMovementDocument(mv, productMap[mv.productId], true); return; }
+      if (act === 'openref') {
+        const mv = byId[rowData.id] || rowData;
+        const ref = String(mv.reference || '');
+        if (!ref) return;
+        const reason = String(mv.reason || '');
+        if (reason === 'Sale') {
+          fbGetSales().then(res => {
+            const sale = (res && res.success ? res.data : []).find(x => x.id === ref || x.invoiceNo === ref);
+            if (sale) openSaleDocument(sale, 'a4', false);
+            else Swal.fire({ icon: 'info', title: 'Nuk u gjet shitja', text: ref });
+          });
+        } else if (reason === 'Fletë Hyrje' || reason === 'Purchase') {
+          openWarehouseReceiptInDocument(ref, false);
+        } else {
+          Swal.fire({ icon: 'info', title: 'Referenca', text: ref });
+        }
+        return;
+      }
       if (act === 'delete') handleDelete(byId[rowData.id] || rowData);
     });
   }, [loading, tableData, role]);
@@ -9162,7 +9187,7 @@ function SalesHistoryView({ user, role }) {
         columnDefs: [{ targets: '_all', defaultContent: '' }], // tolerate rows missing newer fields - no "unknown parameter" warning
         createdRow: (row, d) => { if (d.status === 'credit') $(row).addClass('row-danger'); else if (Number(d.returnedTotal) > 0) $(row).addClass('row-warn'); }, // credit=red, has-return=amber
         columns: [
-          { data: 'invoiceNo', title: 'Fatura', render: (d, t, row) => t === 'display' ? '<code>' + esc(d || String(row.id).slice(-6).toUpperCase()) + '</code>' : (d || row.id) },
+          { data: 'invoiceNo', title: 'Fatura', render: (d, t, row) => t === 'display' ? docLinkHtml('view', row.id, d || String(row.id).slice(-6).toUpperCase()) : (d || row.id) },
           { data: 'createdAt', title: 'Data', render: (d, t) => t === 'display' ? formatDateForDisplay(d) : d },
           { data: 'customerName', title: 'Klienti', render: (d, t) => t === 'display' ? esc(d || 'Walk-in') : d },
           { data: 'cashier', title: 'Arkëtari', render: (d, t) => t === 'display' ? esc(d || '') : d },
@@ -10509,7 +10534,7 @@ function PurchaseOrdersView({ user, role, setActiveMenu }) {
         columnDefs: [{ targets: '_all', defaultContent: '' }],
         createdRow: (row, d) => { if (d.status === 'received') $(row).addClass('row-ok'); else if (d.status === 'cancelled') $(row).addClass('row-muted'); else $(row).addClass('row-warn'); },
         columns: [
-          { data: 'poNumber', title: 'Nr. Porosie', render: (d, t) => t === 'display' ? '<code>' + esc(d || '') + '</code>' : d },
+          { data: 'poNumber', title: 'Nr. Porosie', render: (d, t, row) => t === 'display' ? docLinkHtml('view', row.id, d || '') : d },
           { data: 'createdAt', title: 'Data', render: (d, t) => t === 'display' ? formatDateForDisplay(d) : d },
           { data: 'supplierName', title: 'Furnitori', render: (d, t) => t === 'display' ? esc(d || '-') : d },
           { data: 'itemCount', title: 'Rreshta' },
@@ -10810,7 +10835,7 @@ function WarehouseReceiptsInView({ user, role }) {
             <tbody>
               {filtered.length === 0 ? <tr><td colSpan="8" style={{textAlign:'center', color:'#888', padding:24}}>Nuk ka Fletë Hyrje.</td></tr> : filtered.map(r => (
                 <tr key={r.id || r.docNo}>
-                  <td><code>{warehouseDocNoFromReceipt(r)}</code></td>
+                  <td><button type="button" className="doc-link" onClick={() => setSelectedReceipt(r)}><i className="fas fa-arrow-right"></i>{warehouseDocNoFromReceipt(r)}</button></td>
                   <td>{formatDateForDisplay(r.createdAt)}</td>
                   <td>{r.poNumber || '—'}</td>
                   <td>{r.supplierName || '—'}</td>

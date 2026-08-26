@@ -636,6 +636,9 @@ table.dataTable tbody tr.row-ok td { background: #f3faf5 !important; }
 .fd-signs td { border:1px solid #111; padding:3px 4px; text-align:center; font-weight:700; font-size:10px; }
 .fd-signs td.a { text-align:left; }
 .fd-signs tr.s td { height:9mm; font-weight:400; }
+.doc-link { background:none; border:none; padding:0; color:#714B67; font-weight:800; cursor:pointer; text-decoration:underline; font-size:inherit; }
+.doc-link:hover { color:#4d3347; }
+.doc-link i { margin-right:5px; font-size:0.85em; }
 @media print {
   body[data-print-mode] * { visibility:hidden !important; }
   body[data-print-mode="thermal"] .thermal-slip-print, body[data-print-mode="thermal"] .thermal-slip-print *,
@@ -3641,7 +3644,7 @@ async function fbCreateInitialSetup(data) {
       warehouses: [warehouse],
       defaultWarehouse: warehouse,
       initializedAt: nowIso(),
-      initializedVersion: '1.1.2'
+      initializedVersion: '1.1.3'
     };
 
     try {
